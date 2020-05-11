@@ -1,0 +1,455 @@
+---
+title: "Seminar 5"
+author: "Elena Rybina 'MKH 161'"
+date: "2/18/2018"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+```{r libraries, echo = FALSE, message=F, warning=FALSE}
+#install.packages("NetData")
+library('NetData')
+library(network)
+library(sna)
+library(RColorBrewer) 
+#detach(package:sna) 
+
+```
+
+```{r}
+data(kracknets, package = "NetData")
+head(advice_data_frame)
+head(friendship_data_frame)
+head(reports_to_data_frame)
+```
+
+```{r}
+krack <- list(advice_data_frame, friendship_data_frame, reports_to_data_frame)
+str(krack)
+
+#krack[1]
+#krack[[1]]
+
+## add names to objects in list
+
+names(krack) <- c('advice','friendship','reports')
+length(krack) 
+names(krack)
+```
+
+```{r matrix creation}
+ for (i in 1:length(krack)){ krack[[i]] <- as.matrix(krack[[i]])
+ }
+str(krack)
+
+#subset by 3d column >0
+krack[[1]][,3]
+for(i in 1:3){
+  krack[[i]] <- subset(krack[[i]], (krack[[i]][,3] > 0 )) 
+  }
+
+head(krack[[1]])
+dim(krack[[1]])
+
+
+
+
+
+```
+
+
+```{r networks, fig.align='center'}
+
+names(attributes)
+#kracknet <- list(1:3)
+for (i in 1:3)
+  {
+  krack[[i]] <- network(krack[[i]],
+                      matrix.type = 'edgelist',
+                      vertex.attr = list(attributes[,1], attributes[,2],
+                                         attributes[,3], attributes[,4]), 
+                      vertex.attrnames = list("AGE","TENURE","LEVEL","DEPT"))
+}
+
+advicenet <- krack$advice
+friendshipnet <- krack$friendship
+reportsnet <- krack$reports
+
+advicenet
+friendshipnet
+reportsnet
+
+n<-network.size(advicenet)
+
+#creation of a set of random numbers -- coordinates to run the plot in.
+v1<-sample((0:(n-1))/n) 
+v2<-sample(v1)
+x <- n/(2 * pi) * sin(2 * pi * v1)
+y <- n/(2 * pi) * cos(2 * pi * v2)
+mycoord <- cbind(x,y)
+mycoord
+
+
+par(mar=c(0,0,1,0))
+par(mfrow=c(1,3))
+plot(advicenet, edge.col='azure4', vertex.col='darkorange',
+     vertex.border='azure4',vertex.cex=2,coord=mycoord, main ='Advice')
+plot(friendshipnet, edge.col='azure4', vertex.col='darkorange',
+     vertex.border='azure4',vertex.cex=2, coord=mycoord, main ='Friendship')
+plot(reportsnet, edge.col='azure4', vertex.col='darkorange',
+     vertex.border='azure4',vertex.cex=2, coord=mycoord, main='Direct Reports')
+```
+******      
+
+_**Assignment task.**_ *For the networks we’ve obtained, please calculate the following:*   
+*1. Dyad census*    
+*2. Different kinds of reciprocity*   
+*3. Triad census*   
+*4. Transitivity*   
+*5. Paths*    
+*6. Cycles*   
+*7. Cliques*    
+*Having performed the calculations, please compare your results for each network and make appropriate inferences.*   
+Descriptive statistics for *advicenet*:
+```{r descriptive advicenet}
+
+isSymmetric(as.matrix(advicenet)) #direced
+
+network.dyadcount(advicenet)
+
+dyad.census(advicenet) # types and count of dyads
+
+
+# reciprocity (is a measure of the likelihood of vertices in a directed network to be mutually linked)
+grecip(advicenet, measure = 'dyadic') 
+grecip(advicenet, measure = 'dyadic.nonnull') 
+grecip(advicenet, measure = 'edgewise')
+grecip(advicenet, measure = 'edgewise.lrr')
+grecip(advicenet, measure = 'correlation')
+
+network.edgecount(advicenet)
+
+network.density(advicenet) #max = 1
+
+triad.census(advicenet) # types and counts of triads
+
+gtrans(advicenet, mode="digraph", measure='weak') # transitivity
+
+kpath.census(advicenet, mode = "digraph", tabulate.by.vertex = FALSE, path.comembership = "none",
+             dyadic.tabulation = "none")
+
+kcycle.census(advicenet, maxlen = 4, mode = "digraph", tabulate.by.vertex = FALSE, cycle.comembership = "none")
+
+a <- clique.census(advicenet)
+clique.census(advicenet)$clique.count
+```
+
+
+Descriptive statistics for *friendshipnet*:   
+
+```{r descriptive friendshipnet}
+isSymmetric(as.matrix(friendshipnet)) #direced
+network.dyadcount(friendshipnet)
+dyad.census(friendshipnet) 
+
+grecip(friendshipnet, measure = 'dyadic') 
+grecip(friendshipnet, measure = 'dyadic.nonnull') 
+grecip(friendshipnet, measure = 'edgewise')
+grecip(friendshipnet, measure = 'edgewise.lrr')
+grecip(friendshipnet, measure = 'correlation')
+
+network.edgecount(friendshipnet)
+network.density(friendshipnet) 
+triad.census(friendshipnet) 
+gtrans(friendshipnet, mode="digraph", measure='weak') 
+kpath.census(friendshipnet, mode = "digraph", tabulate.by.vertex = FALSE, path.comembership = "none", dyadic.tabulation = "none")
+kcycle.census(friendshipnet, maxlen = 4, mode = "digraph", tabulate.by.vertex = FALSE, cycle.comembership = "none")
+clique.census(friendshipnet)$clique.count
+```
+
+
+Descriptive statistics for *reportsnet*:   
+
+```{r descriptive reportsnet}
+isSymmetric(as.matrix(reportsnet)) #direced
+network.dyadcount(reportsnet)
+dyad.census(reportsnet) 
+
+grecip(reportsnet, measure = 'dyadic') 
+grecip(reportsnet, measure = 'dyadic.nonnull') 
+grecip(reportsnet, measure = 'edgewise')
+grecip(reportsnet, measure = 'edgewise.lrr')
+grecip(reportsnet, measure = 'correlation')
+
+network.edgecount(reportsnet)
+network.density(reportsnet) 
+triad.census(reportsnet) 
+gtrans(reportsnet, mode="digraph", measure='weak') 
+kpath.census(reportsnet, mode = "digraph", tabulate.by.vertex = FALSE, path.comembership = "none", dyadic.tabulation = "none")
+kcycle.census(reportsnet, maxlen = 4, mode = "digraph", tabulate.by.vertex = FALSE, cycle.comembership = "none")
+clique.census(reportsnet)$clique.count
+```
+
+Each network has the same number of dyads (420) because these are networks of the same people, but types of these dyads (and triads), number of edges and, consequently, density  are different because they are actually completely different networks. The *reportsnet* has only 20 connections -- the fewer number.    
+The highest level of reciprocity is in the network about reports. The highest level of transitivity -- network about advices.    
+*Reportsnet* more short network in terms of pathes: it has more 1-connection-paths than 2-connections-paths that is different from the other networks which have prevaling 3-connections-paths. That's why this network hasn't cycles at all unlike *advicenet* and *friendhipnet* which have it, especially network about advices (it is more simple to give advices than to be friends).
+
+
+******    
+
+##Blockmodelling
+
+###A priori blockmodel
+
+```{r formal roles, fig.align='center'}
+formal<-as.matrix(read.csv("formal.csv", header = TRUE, row.names=1)) 
+roles<-read.csv("roles.csv", header=TRUE, row.names=1)
+formalnet <- network(formal)
+par(mar=c(0,0,2,0))
+indeg <- degree(formalnet, cmode = 'indegree')
+mycoord <- plot(formalnet, displaylabels=TRUE, edge.col='azure4',
+                vertex.col="#E41A1C", vertex.border='azure4',
+                vertex.cex = indeg + 1 , main ='Downton Abbey',
+                label.cex=0.5, label.pos = 5)
+
+
+```
+
+```{r symmetrization, fig.align='center' }
+plot(formalnet)
+orRule <- symmetrize(formalnet, rule='weak') # "or" rule 
+class(orRule) # symmetrize transformed the network into a matrix
+orRule <- network(symmetrize(formalnet, rule='weak'), directed = FALSE) # 'or' rule
+class(orRule) # network
+
+andRule <- network(symmetrize(formalnet, rule='strong'), directed = FALSE) # 'and' rule
+
+par(mar=c(1,1,2,1))
+par(mfrow=c(1,3))
+plot(formalnet, main = 'Original', coord=mycoord, vertex.cex =3,
+     edge.col='azure4', vertex.col="#E41A1C", vertex.border='azure4',
+     label=seq(1:20),label.pos=5,label.cex=.5,label.col='gray15') 
+plot(orRule, main = 'Or Rule', coord=mycoord, vertex.cex =3,
+     edge.col='azure4', vertex.col="#377EB8", vertex.border='azure4',
+     label=seq(1:20),label.pos=5,label.cex=.5,label.col='gray15') 
+plot(andRule, main = 'And Rule', coord=mycoord, vertex.cex =3,
+     edge.col='azure4', vertex.col="#4DAF4A", vertex.border='azure4',
+     label=seq(1:20),label.pos=5,label.cex=.5,label.col='gray15')
+```
+
+
+```{r blockmodelling, fig.align='center' }
+snasymmformalnet <- orRule
+roles$commdetect
+aprioriformalnet <-blockmodel(snasymmformalnet, roles$commdetect, block.content="density",
+                              mode="graph",diag=FALSE)
+heatmap(aprioriformalnet[[4]])
+
+str(aprioriformalnet)
+
+aprioriformalnet[[1]] # = roles$commdetect
+
+#the same
+#aprioriformalnet[[4]]
+#aprioriformalnet$blocked.data
+
+par(mar=c(1,1,1,1),mfrow=c(2,3))
+col5 <- brewer.pal(5, 'Set1')
+cols <- ifelse(aprioriformalnet[[1]] == 1, col5[1], 
+               ifelse(aprioriformalnet[[1]] == 2, col5[2], 
+                      ifelse(aprioriformalnet[[1]] == 3, col5[3],
+                             ifelse(aprioriformalnet[[1]] == 4, col5[4], col5[5])))) 
+par(mar=c(1,1,2,1),mfrow=c(1,1))
+plot(snasymmformalnet, main = 'Apriori Block Model', coord=mycoord, vertex.cex =3, edge.col='azure4',
+     vertex.col=cols, vertex.border='azure4', label=seq(1:20), label.pos=5, label.cex=.5, label.col='gray15')
+```
+
+###Exploratory block model
+
+####Distance Matrix & Hierarchical Clustering
+
+```{r clustering, fig.align='center' }
+# Create an object of distances in the "OR rule," and turn it into a vector
+snasymmformalnet
+
+distformal <-  dist(snasymmformalnet, method="euclidian", diag=FALSE) 
+head(distformal)
+str(distformal)
+class(distformal)
+thickness <- as.vector(distformal)
+
+
+distformalmatr <- as.matrix(distformal)
+str(distformalmatr)
+head(distformalmatr)
+
+# Now, let's visualize these distances as edge thickness
+par(mar=c(0.5,0,2,0))
+plot(snasymmformalnet, main = 'Euclidean Distances', coord=mycoord, vertex.cex =3, edge.col='azure4',
+     vertex.col=col5[2], vertex.border='azure4', label=seq(1:20),label.pos=5, label.cex=.5,label.col='gray15',
+     edge.lwd = thickness^2)
+
+# Cluster analysis
+
+#the same = equiv.clust(snasymmformalnet)
+formalclust <- hclust(distformal, method="complete")
+formalclust
+
+
+
+```
+
+####Exploratory blockmodel
+
+```{r blockmodelling 2, fig.align='center' }
+# And now, a blockmodel based on clustering:
+exploratoryformal<-blockmodel(snasymmformalnet, formalclust, k=6, block.content="density", 
+                              mode="graph", diag=FALSE)
+# Plot the two blockmodels one after another for comparison:
+par(mar=c(0,0,2,0)) 
+plot.blockmodel(aprioriformalnet)
+plot.blockmodel(exploratoryformal)
+```
+******    
+
+_**Assignment task.**_    
+*1. Experiment with k. We’ve set it to 6, but would another number make more sense?*    
+*2. Which of the two blockmodels appear to be more accurate to you? Why?*  
+
+1. Here we by default set number of clusters = 6. But this is not firm number obtained just by guessing. Usually in cluster analysis for determintion is used scree plot. But it doesn't make sense with binary data that we have because the scree will be more or less uniform. So, we can just try to set different numbers (usually number if clusters lies between 2 and 15).    
+
+k = 4:
+
+```{r, fig.align='center' }
+formalclust <- hclust(distformal, method="complete")
+exploratoryformal4<-blockmodel(snasymmformalnet, formalclust, k=4, block.content="density", 
+                              mode="graph", diag=FALSE)
+
+plot.blockmodel(exploratoryformal4)
+```
+k = 5:    
+
+```{r, fig.align='center' }
+formalclust <- hclust(distformal, method="complete")
+exploratoryformal5<-blockmodel(snasymmformalnet, formalclust, k=5, block.content="density", 
+                              mode="graph", diag=FALSE)
+
+plot.blockmodel(exploratoryformal5)
+```
+
+k = 7:    
+
+```{r, fig.align='center' }
+formalclust <- hclust(distformal, method="complete")
+exploratoryformal7<-blockmodel(snasymmformalnet, formalclust, k=7, block.content="density", 
+                              mode="graph", diag=FALSE)
+
+plot.blockmodel(exploratoryformal7)
+```
+
+
+We can see that whithin each k there are two indivisual units: 2 and 4. And main changes relates to division one big cluster to several separate. So, different k won't change division at all. And it makes sence in borders from 2 till 15 clusters.     
+
+2. Model based on aprior knowledge have to be more accurate. 
+
+******    
+
+```{r}
+par(mar = c(1,1,4,1), mfrow = c(1,2)) 
+heatmap(aprioriformalnet[[4]], main ='Apriori Blockmodel')
+heatmap(exploratoryformal[[4]], main ='Exploratory Blockmodel')
+```
+
+###Blockmodeling based on CONCOR function
+
+```{r}
+#View(formal[-20,20])
+connectedformal<-formal[-20,-20] # operation on the matrix 
+class(connectedformal)
+head(connectedformal)
+```
+
+```{r CONCOR function}
+CONCOR <- function(mat, max.iter=1000, epsilon=1e-10){
+mat <- rbind(mat, t(mat)) # stack
+colN <- ncol(mat) # width
+X <- matrix(rep(0, times=colN*colN), nrow=colN, ncol=colN) 
+target.abs.value <- colN * colN - epsilon # convergence target 
+for (iter in 1:max.iter){ 
+    for(i in 1:colN) {
+      for(j in i:colN){
+        X[i,j]<-cor(mat[,i], mat[,j], method=c("pearson")) 
+      } 
+    } 
+  mat <- X+(t(X)-diag(diag((X))))
+if (sum(abs(mat)) > target.abs.value) { # test convergence
+      #Finished before max.iter iterations
+return(mat) 
+  } 
+} 
+return(mat) 
+} 
+```
+
+```{r}
+rownames(connectedformal) <- row.names(roles)[1:19] 
+rownames(connectedformal)
+colnames(connectedformal) <- row.names(roles)[1:19]
+colnames(connectedformal) 
+
+
+CONCORFORMAL<-CONCOR(connectedformal)
+
+print(CONCORFORMAL) 
+heatmap(CONCORFORMAL)
+```
+```{r CONCOR part 1}
+ ## part 1 -it's blocks from 14 to 19:
+part1 <- connectedformal[14:19,14:19] 
+colnames(part1) # Who are in this partition?
+
+#division 14%19 on clusters
+concor1 <- CONCOR(part1) 
+heatmap(concor1)
+
+```
+
+
+```{r CONCOR part 2}
+ ## part 1 -it's blocks from 14 to 19:
+part2 <- connectedformal[1:13,1:13] # isolate the first 13 nodes
+concor2 <- CONCOR(part2) # Run through CONCOR 
+heatmap(concor2) # Look at the result
+
+```
+
+```{r CONCOR part 31}
+part3<-c(1,3,8,9,12,13) # isolate the needed nodes 
+part3.1<-part2[part3,part3] # remove the isolates from partition 2 
+colnames(part3.1) # Who is here?
+
+```
+
+```{r CONCOR part 32}
+part3.2 <- part2[-part3,-part3] # Extract remaining nodes from part2 
+concor3.2 <- CONCOR(part3.2) # Run it through CONCOR 
+heatmap(concor3.2)
+colnames(part3.2[1:2,1:2]) # Names in the first subpart
+colnames(part3.2[3:7,3:7]) # Names in the second subpart
+
+```
+
+```{r CONCOR part 322}
+part3.2.2 <- part3.2[3:7,3:7] # Create a partition
+```
+
+
+*******   
+
+_**Assignment task.**_ *Try not to get lost in all the partitions! Please list all the finite block-partitions that we have generated and the names of all people that ended up in every block*    
+
+*******  
+
+partition 3: *part 3.1*, names `r colnames(part3.1)`    
+partition 4: *part 3.2.1*, names `r colnames(part3.2[1:2,1:2])`, *part 3.2.2*, names `r colnames(part3.2[3:7,3:7])`

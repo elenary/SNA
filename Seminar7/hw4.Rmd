@@ -1,0 +1,284 @@
+---
+title: "Homework 4"
+author: "Elena Rybina 'MKH 161'"
+date: "3/07/2018"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+```{r libraries, echo = FALSE, message=F, warning=FALSE}
+library(network)
+library(sna)
+library(RColorBrewer) 
+library(NetData)
+library(nFactors)
+library("stats")
+library(psych)
+
+
+```
+
+##Data loading
+
+
+```{r}
+ocb_att<-read.csv('ocb_att.csv', header=TRUE, sep = ';')
+```
+
+## Hypothesis
+
+We have bunch of personal information about employees, their feelings about their job, some features of their job and network measures. For me it would be intersting to test could satisfaction about the job be predicted by personal information, social measures (like a number of working social connections and social working power of person) and job's features (like a amount, complexity and speed of work, conflicts on workspace etc).
+
+## Variables
+
+Create variables from questionnaire.
+```{r variables}
+age<-ocb_att$Age
+
+sex<-ocb_att$Sex
+
+tenureTitle<-ocb_att$WorkTitleYear+ocb_att$WorkTitleMonth/12
+tenureOrg<-ocb_att$WorkOrgYear+ocb_att$WorkOrgMonth/12
+tenureSup<-ocb_att$RepSupYear+ocb_att$RepSupMonth/12
+workAmount <- rowMeans(cbind(ocb_att$Q1,ocb_att$Q2,ocb_att$Q3),na.rm=TRUE)
+workResponsibility <- rowMeans(cbind(ocb_att$Q4,ocb_att$Q5,ocb_att$Q6),na.rm=TRUE)
+workComplexity <- rowMeans(cbind(ocb_att$Q7,ocb_att$Q8,ocb_att$Q9),na.rm=TRUE)
+workSpeed <- rowMeans(cbind(ocb_att$Q10,ocb_att$Q11,ocb_att$Q12),na.rm=TRUE)
+professionalGrowth <- rowMeans(cbind(ocb_att$Q13,ocb_att$Q14),na.rm=TRUE)
+relationshipPower <- rowMeans(cbind(ocb_att$Q15,ocb_att$Q16,ocb_att$Q17),na.rm=TRUE)
+administrativeProblem <- rowMeans(cbind(ocb_att$Q18,ocb_att$Q19,ocb_att$Q20),na.rm=TRUE)
+conflicts <- rowMeans(cbind(ocb_att$Q21,ocb_att$Q22,ocb_att$Q23),na.rm=TRUE)
+uncertainty <- rowMeans(cbind(ocb_att$Q24,ocb_att$Q25,ocb_att$Q26),na.rm=TRUE)
+rolesConflicts <- rowMeans(cbind(ocb_att$Q27,ocb_att$Q28,ocb_att$Q29),na.rm=TRUE)
+physPart<-rowMeans(cbind(ocb_att$Q30,ocb_att$Q31,ocb_att$Q32,ocb_att$Q33),na.rm=TRUE)
+emotionalPart<-rowMeans(cbind(ocb_att$Q31,ocb_att$Q32,ocb_att$Q33,ocb_att$Q34),na.rm=TRUE)
+
+```
+
+We are also intersted in testing of network parametres. We have four different netwroks: professional connections, boss connections, friends connections and supporting connections. For checking emotional participation in work in general we rather don't need boss connections. We will use amount of connections and its type and power of node from the network of support and will see how strong it might contribute in satisfaction about job.
+
+```{r network variables, fig.align='center'}
+supportNet<-read.csv('SupportNet.csv', header=TRUE, row.names = 1, sep = ';')
+support_mat<-as.matrix(supportNet)
+ncol(support_mat)
+support_network<-as.network(support_mat, directed=TRUE)
+plot(support_network)
+
+```
+
+
+```{r}
+indegree <- degree(support_network, gmode = 'digraph', diag = FALSE, cmode = 'indegree', 
+                   rescale = FALSE, ignore.eval = FALSE)
+indegree
+outdegree <- degree(support_network, gmode = 'digraph', diag = FALSE, cmode = 'outdegree', 
+                    rescale = FALSE, ignore.eval = FALSE)
+outdegree
+degree.f <- degree(support_network, gmode = 'digraph', diag = FALSE, cmode = 'freeman',
+                   rescale = FALSE, ignore.eval = FALSE)
+degree.f
+eigen <- evcent(support_network, gmode = 'digraph', diag = FALSE, rescale = FALSE)
+eigen
+```
+
+
+```{r libraries 2, echo = FALSE, message=F, warning=FALSE}
+detach(package:sna) 
+detach(package:network) 
+library(igraph)
+```
+
+We have to find correspondence between centrality measures for 122 persons and answers on questionnaire from 68 people. To be honest, right now I don't want to create something complettely new and just will use the way that was shown. 
+
+```{r}
+sup_graph<-graph_from_adjacency_matrix(support_mat) 
+
+names<-ocb_att$Name 
+gender_vector<-vector() 
+
+for(i in 1:122){ 
+for(j in 1:68){ 
+  if(V(sup_graph)$name[i]==names[j]){
+           gender_vector[i]<-sex[j]
+break;}
+  else{gender_vector[i]<-NA}
+} }
+
+v_indegree<-vector() 
+v_outdegree<-vector() 
+v_degree.f<-vector() 
+v_eigen<-vector()
+
+for(i in 1:122){
+     for(j in 1:68){
+if(V(sup_graph)$name[i]==names[j]){ 
+
+v_indegree[j]<-indegree[i]
+v_outdegree[j]<-outdegree[i]
+v_degree.f[j]<-degree.f[i]
+v_eigen[j]<-eigen[i]
+
+break;}
+         else{}
+} }
+
+v_indegree
+v_outdegree
+v_degree.f
+v_eigen
+```
+
+
+
+##Assumptions checking
+
+Linear regression requires:
+
++ predictors: continuous data (in ordinal scale with more than 4 levels, interval scale or ratio scale) or categoral data with two levels; 
++ normality of distribution (for interval scales);
++ independence of errors;
++ normality of errors;
++ absence of multicollinearity among predictors
+
+Measurement: R-square, t (or F) value and p-value
+Effect size -- R square (or adjusted R square)    
+
+### Scales
+All our data are coded in ordinal scale with 7 levels, exept for age (ratio) and sex (nominal). It suits requirments for types of variables.   
+
+
+### Multicollinearity
+
+Lets initially check multicollinearity of predictors. Find higly correlated predictors, correlation of which is above 0.7.
+
+
+```{r libraries 3, echo = FALSE, message=F, warning=FALSE}
+library(Hmisc)
+```
+
+```{r}
+rcorr(cbind(age, sex, tenureTitle, tenureOrg, tenureSup, workAmount, workResponsibility, workComplexity, 
+            workSpeed, professionalGrowth, relationshipPower, administrativeProblem, conflicts, 
+            uncertainty, rolesConflicts, physPart, v_indegree, v_outdegree, v_degree.f, v_eigen))
+```
+
+We see that *tenureTitle* higly correlates with *tenureOrg* and *tenureSup*, and this correlation is higly significant (p ~ 0.0000). So, we drop tenureTitle and tenureSup and continue with *tenureOrg*.    
+And *ProfessionalGrowth* correlates with *workComplexity* with r = 0.72 (p ~ 0.0000), that was not obvious, but it quite logic. Will later work with *workComplexity* and will remember that it also means possibilty ti professional growth.     
+And, of course, indegree and outdegree higly correlate with full degree. Will continue only with *v_degree.f*   
+
+
+```{r libraries 4, echo = FALSE, message=F, warning=FALSE}
+detach(package:Hmisc) 
+```
+
+
+### Normality of distribution
+
+It makes sense to test normality of distribution only for interval or ration data. In our dataset we have several such variables -- age and tenureOrg. Lets look at the its distribution.
+
+```{r, fig.align='center'}
+
+table(age)
+describe(age)
+hist(x = age, breaks = seq(min(age), max(age), 1), 
+     xlim = c(min(age), max(age)), prob=T, xaxt = "n")
+axis(1, at = seq(min(age), max(age), 1), 
+     labels = seq(min(age), max(age), 1))
+curve(dnorm(x, mean = mean(age), sd = sd(age)), col="red", add = T)
+
+qqnorm(age); qqline(age, col = "red")
+```
+
+Age doesn't look like a normally distributed data, so, we won't use it.   
+
+
+```{r, fig.align='center'}
+describe(tenureOrg)
+
+hist(x = tenureOrg, breaks = seq(min(tenureOrg), max(tenureOrg), 0.5), 
+     xlim = c(min(tenureOrg), max(tenureOrg)), prob=T, xaxt = "n")
+axis(1, at = seq(min(tenureOrg), max(tenureOrg), 1), 
+     labels = seq(min(tenureOrg), max(tenureOrg), 1))
+curve(dnorm(x, mean = mean(tenureOrg), sd = sd(tenureOrg)), col="red", add = T)
+
+qqnorm(tenureOrg); qqline(tenureOrg, col = "red")
+```
+
+*tenureOrg* is farther away from normal distribution. We can try to lead these data to normal view and standardized it through the logarithmic scale or reciprocal transformation, but it requires a lot of time and I won't do it here. Just won't use these variables at all.
+
+Let's look at distributions of other variables. So as originally it was ordinal data, but later we have calculated means, it becomes inconvenient just to look at the table. And I will use also descriptive statistics for that to see how close mean and median and what is going on on the max and min borders.   
+
+
+```{r}
+describe(emotionalPart)
+describe(workAmount)
+describe(workResponsibility)
+describe(workComplexity)
+describe(workSpeed)
+describe(relationshipPower)
+describe(administrativeProblem)
+describe(conflicts)
+describe(uncertainty)
+describe(rolesConflicts)
+describe(physPart)
+
+```
+For all variables mean is close to median, min is about 1-2 and max is about 6-7, skewness and kurtosis for all variables are about 0 (besides *workResponsibility* and *rolesConflictsand*, but deviation is about 1 and they are important variables, so, let's skip it). So, it seems that all our variables could go to our model.
+
+
+##Regression model
+
+Let's put all obtained variables on the first model.
+```{r regression}
+
+lm1<-lm(emotionalPart ~ workAmount + workResponsibility + workComplexity + workSpeed + relationshipPower+ 
+          administrativeProblem + conflicts + uncertainty + rolesConflicts + physPart + v_degree.f + v_eigen) 
+
+summary(lm1)
+
+```
+
+We see that several variables are significant: *conflicts,* *rolesConflicts* and *physPart*.     
+We can just drop out all non significant variables, but let's use stepwise procedure for sorting models out by Akaike information criterion.
+
+```{r}
+step(lm1, direction = 'backward')
+```
+Three models has the least AIC = -172:    
+* *emotionalPart ~ workResponsibility + administrativeProblem + conflicts + rolesConflicts + physPart *   
+* *emotionalPart ~ administrativeProblem + conflicts + rolesConflicts + physPart*   
+* *emotionalPart ~ conflicts + rolesConflicts + physPart*
+
+Let's choose one.
+
+```{r}
+ 
+lm2 <- lm(emotionalPart ~ workResponsibility + administrativeProblem + conflicts + rolesConflicts + physPart)
+summary(lm2)
+lm3 <- lm(emotionalPart ~ administrativeProblem + conflicts + rolesConflicts + physPart)
+summary(lm3)
+lm4 <- lm(emotionalPart ~ conflicts + rolesConflicts + physPart)
+summary(lm4)
+
+anova(lm2, lm3, lm4)
+
+```
+The differences in Sum od squares and F values between these models are very small. So, I suppose, it is rational to choose model with the least number of variables if they explain the same amount of variability.    
+And this is model **emotionalPart ~ conflicts + rolesConflicts + physPart**.    
+
+Let's check normality of errors.
+```{r, fig.align='center'}
+ss <- residuals(lm4)
+describe(ss)
+
+hist(ss, xlim = c(min(ss), max(ss)), prob=T, xaxt = "n")
+curve(dnorm(x, mean = mean(ss), sd = sd(ss)), col="red", add = T)
+qqnorm(ss); qqline(ss, col = "red")
+
+```
+
+Errors look like normally distributed.    
+
+So, I stayed on the model that could explain variablity in emotional participation (or satisfacton about job) through the presence or absence of interpersonal conflicts, roles conflicts, and physical participation. The last variable, I think, is here just because the more time you spend on the work -- the higher probability to be not satisfided with it.  
+

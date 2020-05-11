@@ -1,0 +1,247 @@
+---
+title: "Seminar 9"
+author: "Elena Rybina 'MKH 161'"
+date: "3/21/2018"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+  
+  
+```{r libraries, echo = FALSE, message=F, warning=FALSE}
+library(network)
+library(sna)
+library(RColorBrewer) 
+library(NetData)
+library(statnet)
+library(coda)
+library(ergm)
+library(rgl)
+library(stats)
+```
+
+#ERGM
+
+##ERGM creation, continued
+
+
+```{r}
+data(studentnets.ergm173, package = "NetData")
+class(edges)
+head(edges)
+dim(edges)
+head(nodes)
+dim(nodes)
+```
+
+
+To execute the ERGM, R requires continuous integer IDs: [1:n], where n is the total number of nodes in the ERGM. So, create node IDs acceptable to R and map these to the edges.
+```{r}
+#create vector of IDs
+id <- seq(1,22,1) 
+nodes1<-cbind(id, nodes) 
+class(nodes1)
+head(nodes1)
+nodes1[,1:2]
+
+
+#correspondance
+edges2<-merge(nodes1[,1:2], edges, by.x = 'std_id', by.y='alter_id') 
+head(edges2) #check the new edge dataset
+dim(edges2)
+
+names(edges2)[1]<-"alter_id"
+names(edges2)[2]<-"alter_R_id"
+edges3<- merge(nodes1[,1:2], edges2, by.x = "std_id", by.y="ego_id") #data with IDs we need
+names(edges3)[1]<-"ego_id" 
+names(edges3)[2]<-"ego_R_id" 
+head(edges3)
+```
+
+##Creating the network and moving onto ERGM
+
+```{r, fig.align='center'}
+net<-network(edges3[,c("ego_R_id", "alter_R_id")]) #Dyads will be the unit of analysis 
+# Assign edge-level attributes - dyad attributes
+edges[,2]
+set.edge.attribute(net, "ego_R_id", edges[,2])
+set.edge.attribute(net, "alter_R_id", edges[,4])
+# Assign node-level attributes to actors in "net"
+net %v% "gender" <- nodes1[,3] 
+net %v% "grade" <- nodes1[,4] 
+net %v% "race" <- nodes1[,5]
+net %v% "pci" <- nodes1[,6] 
+plot(net) # Look at the network
+```
+
+
+```{r}
+m1<-ergm(net ~ edges + mutual + nodematch("gender") + absdiff("pci"),burnin=15000,MCMCsamplesize=30000,verbose=FALSE)
+#incomes are cored absolute difference
+
+summary(m1)
+```
+
+
+```{r}
+lapply(m1[1],exp) #this gets us a vector of exponents
+
+exp(m1[1]$coef)
+
+```
+
+*******    
+
+_**Assignment task:**_
+*1. For the model above, explain the effect of absolute differences in pci on tie formation.* 
+Rought exponential form of coefficient = 1.00011144 we can say that absolute differences in pci is almost the same as in the random graph, so, it doesn't affect tie formation.
+*2. For the coefficients above, calculate the associated probabilities.*    
+```{r}
+#edges
+exp(-2.316e+00)/(1+exp(-2.316e+00))
+#mutual
+exp(2.420e+00)/(1+exp(2.420e+00))
+#nodematch.gender
+exp(1.674e-02)/(1+exp(1.674e-02))
+#absolute differences in pci
+exp(1.114e-04)/(1+exp(1.114e-04))
+
+
+```
+
+
+Log-odds for edges is -2.316e+00, probability to form a tie is p = exp(-2.316e+00)/(1+exp(-2.316e+00)) = `r exp(-2.316e+00)/(1+exp(-2.316e+00))`.    
+Log-odds for mutual is 2.420e+00, probability that tie will be mutual is p = exp(2.420e+00)/(1+exp(2.420e+00)) = `r exp(2.420e+00)/(1+exp(2.420e+00))`. 
+Log-odds for nodematch.gender is 1.674e-02, probability for form tie with matching gender is p = exp(1.674e-02)/(1+exp(1.674e-02)) = `r exp(1.674e-02)/(1+exp(1.674e-02))`.    
+Log-odds for absolute differences in pci is 1.114e-04, probability is p = exp(1.114e-04)/(1+exp(1.114e-04)) = `r exp(1.114e-04)/(1+exp(1.114e-04))`.   
+
+*3. Re-run the model with only the significant elements present. For the obtained coefficients, calculate the associated probabilities. What do you observe?*   
+
+```{r}
+m2<-ergm(net ~ edges + mutual +  absdiff("pci"),burnin=15000,MCMCsamplesize=30000,verbose=FALSE)
+summary(m2)
+```
+Log-odds for edges is -2.304e+00, probability to form a tie is p = exp(-2.304e+00 )/(1+exp(-2.304e+00 )) = `r exp(-2.304e+00 )/(1+exp(-2.304e+00 ))`.    
+Log-odds for mutual is  2.410e+00, probability that tie will be mutual is p = exp( 2.410e+00)/(1+exp( 2.410e+00)) = `r exp( 2.410e+00)/(1+exp( 2.410e+00))`. 
+Log-odds for absolute differences in pci is 1.106e-04, probability is p = exp(1.106e-04)/(1+exp(1.106e-04)) = `r exp(1.106e-04)/(1+exp(1.106e-04))`.     
+
+*******   
+
+##Model Diagnostics: troubleshooting and checking for model degeneracy    
+
+```{r simulation}
+
+m1.sim<-simulate(m1, nsim=10) # nsim is the number of simulated models
+class(m1.sim) #check what we get
+m1.sim
+summary(m1.sim)
+
+
+```
+
+```{r, fig.align='center'}
+m1.sim[[1]] #first simulated model
+m1.sim[[2]] #second simulated model
+# We can also look at them:
+par(mfrow=c(1,3), mar=c(0,0,0,0)) 
+plot(net) # original model 
+plot(m1.sim[[1]]) 
+plot(m1.sim[[2]])
+```
+******    
+
+
+**Assignment task:** *For the model you created above (with only the significant coefficients) create a set of simulated models and plot a few against the original. What do you observe?*
+
+```{r, fig.align='center'}
+m2.sim<-simulate(m2, nsim=5) # nsim is the number of simulated models
+m2.sim
+summary(m2.sim)
+m2.sim[[1]] 
+m2.sim[[2]] 
+par(mfrow=c(1,3), mar=c(0,0,0,0)) 
+plot(net) # original model 
+plot(m2.sim[[1]]) 
+plot(m2.sim[[2]])
+```
+
+
+******    
+
+##Goodness of fit, "gof"
+
+
+```{r checking on data, fig.align='center'}
+library(knitr)
+m1.gof<-gof(m1~idegree)
+m1.gof
+# The code below is commented out, but if you want to see
+# what we get with m1.gof object, check it:
+names(m1.gof)
+m1.gof$pval.ideg
+kable(m1.gof$pval.ideg, caption="Goodness-of-fit for Indegree")
+
+ par(mfrow=c(1,1)) 
+ plot(m1.gof)
+```
+
+******    
+
+_**Assignment task:**_ *For the model you created above (with only the significant coefficients) run a goodness- of-fit test with any network characteristic you choose, which is not already in the model. Generate a table with information and a plot. What do you observe?*
+
+
+```{r, fig.align='center'}
+m2.gof<-gof(m2~distance)
+m2.gof
+# The code below is commented out, but if you want to see
+# what we get with m1.gof object, check it:
+names(m2.gof)
+m2.gof$pval.ideg
+kable(m2.gof$pval.ideg, caption="Goodness-of-fit for Geodesic distances")
+
+par(mfrow=c(1,1)) 
+plot(m2.gof)
+```
+
+We can see from the gof grapth that our model fits geodesic deistances of the observable data very well.
+
+*****   
+
+##Markov Chain Monte Carlo, MCMC diagnostics
+
+```{r, fig.align='center'}
+par(mar=c(0,0,0,0)) 
+mcmc.diagnostics(m1)
+```
+
+```{r, fig.align='center'}
+data('faux.magnolia.high') 
+magnolia <- faux.magnolia.high 
+par(mar=c(0,0,0,0)) 
+plot(magnolia, vertex.cex=.5)
+
+```
+```{r}
+#fit <- ergm(magnolia~edges+triangle, control=control.ergm(seed=1))
+```
+```{r}
+fit <- ergm(magnolia~edges+triangle, control=control.ergm(seed=1,MCMLE.maxit=3))
+mcmc.diagnostics(fit)
+
+```
+```{r}
+fit2 <- ergm(magnolia~edges+gwesp(0.5,fixed=T),control = control.ergm(seed=1))
+mcmc.diagnostics(fit2)
+```
+
+```{r}
+fit3 <- ergm(magnolia~edges+gwesp(0.25,fixed=T),control = control.ergm(seed=1), verbose=T)
+mcmc.diagnostics(fit3)
+```
+
+```{r}
+fit4 <- ergm(magnolia~edges+gwesp(0.25,fixed=T)+ nodematch('Grade')+nodematch('Race')+nodematch('Sex'),
+control = control.ergm(seed=1,MCMC.samplesize=50000,MCMC.interval=1000), verbose=T)
+mcmc.diagnostics(fit4)
+```
+

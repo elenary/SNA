@@ -1,0 +1,125 @@
+---
+title: "Homework5"
+author: "Elena Rybina 'MKH 161'"
+date: "2/21/2018"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+
+
+```{r libraries, echo = FALSE, message=F, warning=FALSE}
+
+library(network)
+library(sna)
+library(RColorBrewer) 
+library(NetData)
+library(statnet)
+library(coda)
+library(ergm)
+library(rgl)
+library(stats)
+library(intergraph)
+library(knitr)
+
+```
+
+##Reading the data
+
+```{r}
+supportNet<-read.csv('SupportNet.csv', header=TRUE, row.names = 1, sep = ';')
+support_mat<-as.matrix(supportNet)
+ncol(support_mat)
+support_network<-as.network(support_mat, directed=TRUE)
+plot(support_network)
+```
+
+## Unconditional ERGM
+
+```{r}
+model1 <- ergm(support_network~edges)
+summary(model1)
+#probability
+plogis(coef(model1))
+```
+
+#Adding mutuaity
+
+```{r}
+
+model2 <- ergm(support_network~edges + mutual)
+summary(model2)
+#probability
+plogis(coef(model2))
+plogis(coef(model2)[['edges']] + coef(model2)[['mutual']])
+```
+We see, that given tie formation probability to form reciprocal tie is a bit higher -- 34%.
+
+
+```{r}
+mcmc.diagnostics(model2)
+```
+
+Distribution is close to normal, so, our model works well.
+
+# Adding vertex atributes
+
+```{r}
+list.vertex.attributes(support_network)
+ocb_att<-read.csv('ocb_att.csv', header=TRUE, sep = ';')
+
+support_network$vertex.names
+
+
+names<-ocb_att$Name # pull the names out of attributes dataset 
+gender_vector<-vector() #create a vector for gender
+
+
+
+# detach(package:network)
+# detach(package:sna)
+library(igraph)
+support_network_igraph <- graph.adjacency(support_mat, mode=c("directed"), diag=FALSE)
+
+# Next, run a double-loop and assign gender to a corresponding node:
+for(i in 1:122){ # this is our set of all network nodes
+for(j in 1:68){ # this is our set of attribute-containing nodes
+# for each node in i, we run through all node in j # and compare names 
+  if(V(support_network_igraph)$name[i]==names[j]){
+      #if we match, we add the attribute to a vector
+           gender_vector[i]<-ocb_att$Sex[j]
+           # and exit the inner loop for the next i
+break;}
+# if not, we are assigning a missing value
+# and keep going until we find a matching node 
+  else{gender_vector[i]<-NA}
+} }
+# Let's look at the result:
+gender_vector
+
+
+
+support_network<-set.vertex.attribute(support_network_igraph, 'gender', value=c(gender_vector))
+```
+
+```{r}
+detach(package:igraph)
+
+library(network)
+library(sna)
+```
+
+
+```{r}
+
+support_network <- asNetwork(support_network)
+model2.gof2<-gof(model2~idegree + odegree)
+names(model2.gof2)
+#model2.gof2$pval.ideg
+kable(model2.gof2$pval.ideg, caption="Goodness-of-fit for degree")
+
+ par(mfrow=c(1,1)) 
+ plot(model2.gof2)
+```
+

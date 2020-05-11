@@ -1,0 +1,171 @@
+---
+title: "Seminar 3"
+author: "Elena Rybina 'MKH 161'"
+date: "1/24/2018"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r libraries, echo = FALSE, message=F, warning=FALSE}
+#install.packages('RColorBrewer')
+#install.packages('sna')
+library('RColorBrewer')
+library('sna')
+library('network')
+#library('igraph')
+```
+
+##Experimenting with graphs     
+
+[Tutorial about 'network' package](https://cran.r-project.org/web/packages/network/network.pdf)
+```{r, fig.align='center'}
+load('madmen.Rdata')
+#View(mad.matrix)
+dim(mad.matrix)
+head(mad.matrix)
+mad.matrix[1:6,1:2]
+sum(as.character(mad.att[,1]) == colnames(mad.matrix))
+mad.net <- as.network(mad.matrix, directed=F)
+plot(mad.net)
+mad.net
+
+set.vertex.attribute(mad.net,attrname='female', value=mad.att[,2])
+```
+ 
+_**Assignment question:**_ *Why did I use option FALSE for command “directed” above, when creating a network?*     
+Because our graph apparently has both directions towards each of partners and it is undirected.    
+But it might depend on operationalization of sexual link.
+
+```{r, fig.align='center'}
+par(mar=c(0,0.5,0,0.5),mfrow=c(1,2))
+colors <- ifelse(mad.att$Female == 1, 'red', 'blue')
+plot(mad.net, vertex.col=colors, coord=plot(mad.net))
+```
+
+##Experimenting with network layouts
+
+The Fruchterman-Reingold Algorithm is a force-directed layout algorithm. The idea of a force directed layout algorithm is to consider a force between any two nodes. In this algorithm, the nodes are represented by steel rings and the edges are springs between them. The attractive force is analogous to the spring force and the repulsive force is analogous to the electrical force. The basic idea is to minimize the energy of the system by moving the nodes and changing the forces between them. For more details refer to the Force Directed algorithm.     
+<https://github.com/gephi/gephi/wiki/Fruchterman-Reingold>, <https://en.wikipedia.org/wiki/Force-directed_graph_drawing>
+```{r, fig.align='center'}
+par(mar=c(0,0,0,0))
+plot(mad.net, vertex.col = colors, mode = 'circle')
+plot(mad.net, vertex.col = colors, mode = 'fruchtermanreingold')
+plot(mad.net, vertex.col = colors, mode = 'kamadakawai')
+```
+
+
+##Experimenting with colors
+
+```{r, fig.align='center'}
+brewer.pal.info
+
+
+display.brewer.pal(9, 'Reds')
+
+par(mar=c(2,2,2,2)) 
+display.brewer.pal(12, 'Paired') #1st number of colors
+
+par(mar=c(1,1,1,1),mfrow=c(2,3)) #mfrow divided space on x and y axises
+#doesn't work in rmarkdown, only in native plots
+display.brewer.pal(5, 'Accent')
+display.brewer.pal(3, 'Accent')
+display.brewer.pal(5, 'Dark2')
+display.brewer.pal(5, 'Pastel1')
+display.brewer.pal(5, 'Set1')
+display.brewer.pal(5, 'Set2')
+display.brewer.pal(5, 'Set3')
+display.brewer.pal(9, 'Greys')
+
+#---new colors for graph----
+col1 <- brewer.pal(5, 'Set1') #pick this set for bright colors 
+colPastel<-brewer.pal(5, 'Pastel1') #pick this set for pastel colors
+colors <- ifelse(mad.att$Female == 1, col1[3], colPastel[5])
+par(mar=c(0,0,0,0), mfrow=c(1,1))
+plot(mad.net, vertex.col = colors)
+```
+
+_**Assignment task:**_ *Please examine the options in the “network.layout”" command and perform the following:*
+*1. Create the madmen.net with labels.*
+*2. Experiment with options by adding attributes, changing vertex or edge colors, finding the best position for labels. While this task may take a while, it will count as complete if you generate at least one graph that is different from the graphs I’ve shown you in this assignment. The more different graphs with options you generate, the better - extra-credit never hurts anyone.*
+
+
+```{r, fig.align='center'}
+#graphs with plot.network and different layouts
+
+par(mar=c(0,0,0,0), mfrow=c(1,1))
+colors_set3 <- brewer.pal(5, 'Set3')
+colors_greys <- brewer.pal(9, 'Greys')
+colors3 <- ifelse(mad.att$Female == 1, colors_set3[4], colors_set3[5])
+plot.network(mad.net, vertex.col = colors3, edge.col = colors_greys[2], label = network.vertex.names(mad.net),
+             mode = 'kamadakawai', displayisolates = T, label.pos = 2, label.cex = 0.5)
+plot.network(mad.net, vertex.col = colors3, edge.col = colors_greys[2], label = network.vertex.names(mad.net), 
+             mode = 'circle', label.cex = 0.5, label.pos = 10, vertex.cex = apply(mad.matrix,2,sum))
+
+#graph with network.layout
+#network.layout.kamadakawai(mad.net, )
+#plot(mad.net, vertex.col = colors3, label = network.vertex.names(mad.net))
+```
+
+##Calculating network statistics
+
+
+
+```{r, fig.align='center'}
+load('flo.Rdata') 
+marriage.matrix <- as.matrix(flo.marriage)
+isSymmetric(marriage.matrix)  
+marriage.network <- as.network(flo.marriage, directed = F)
+#matrix is needed for graph for checking on symmetry
+#if we have no idea we have to check is it symmetric for answering is it directed or not
+
+network.dyadcount(marriage.network)
+dyad.census(marriage.network) # types and count of dyads
+# null -- how many connection to add for completing network
+network.edgecount(marriage.network)
+network.density(marriage.network) #max = 1
+triad.census(flo.marriage) # types and counts of triads
+gtrans(flo.marriage, measure='weak') # transitivity
+# Paths require a more involved command:
+kpath.census(flo.marriage, mode = "digraph", tabulate.by.vertex = FALSE, path.comembership = "none",
+              dyadic.tabulation = "none")
+#Of course, if you set tabulate.by.vertex=TRUE, you will get counts of all path lengths by individual vertex.
+# Same applies to vertices (including by vertex):
+kcycle.census(flo.marriage, maxlen = 4, mode = "digraph", tabulate.by.vertex = FALSE, cycle.comembership = "none")
+plot(marriage.network)
+```
+
+###Geodesic distances     
+
+<https://www.sci.unich.it/~francesc/teaching/network/geodesic.html>
+```{r Geodesic distances, fig.align='center'}
+# The command is simply geodist, but we will assign it to an object:
+geo.dist<-geodist(flo.marriage) 
+class(geo.dist) # Check the structure
+# Ok, it's a list, let's look at it:
+summary(geo.dist)
+#We can also summarize individual elements.
+# These summaries give us all relevant information for all nodes. 
+summary(geo.dist$gdist)
+summary(geo.dist$counts)
+summary(geo.dist$counts[,3])
+summary(geo.dist$counts[3,])
+```
+_**Assignment question:**_ *What can you say about the last two commands? Why is the result what it is?*     
+Command *summary(geo.dist$counts[,3])*  returns summary of descriptive statistics for 3d column in the matrix of flo.marriage data. Command *summary(geo.dist$counts[3,])* returns summary of descriptive statistics for 3d row in this matrix. So as matrix(flo.marriage) is symmetric (we have chacked it throught the calling command *isSymmetric(marriage.matrix)*) both commands return the same result.     
+
+###Reciprocity     
+
+```{r Reciprocity}
+grecip(flo.marriage, measure = 'dyadic') # why not 0?
+grecip(flo.marriage, measure = 'dyadic.nonnull')
+grecip(flo.marriage, measure = 'edgewise')
+grecip(flo.marriage, measure = 'edgewise.lrr')
+grecip(flo.marriage, measure = 'correlation')
+
+```
+

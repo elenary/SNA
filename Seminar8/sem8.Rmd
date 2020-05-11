@@ -1,0 +1,299 @@
+---
+title: "Seminar 8"
+author: "Elena Rybina 'MKH 161'"
+date: "3/07/2018"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+
+
+```{r libraries, echo = FALSE, message=F, warning=FALSE}
+library(network)
+library(sna)
+library(RColorBrewer) 
+library(NetData)
+library(statnet)
+library(coda)
+library(ergm)
+library(rgl)
+library(stats)
+#detach(package:sna) 
+
+
+```
+
+##Logistic regression
+
+
+*******      
+
+_**Assignment task:**_ *Please answer the following questions:*
+*1. What is an odds function?*    
+Odds is likelihood that the event will take place, or probability of the possible event. 
+*2. What is an odds ratio?*   
+Odds ratio (for binary variables such as events) is the probability of event occurrence divided by the probability of event non-occurrence (p/(1-p)).    
+*3. What is a log-odds function?*   
+log-odds function or logit function calculates log-odds = logit = ln(p/(1-p)) and describes how likely the event is. It is the inverse of the logistic function. It is simplier for interpretation than just regular probability.    
+*4. What is a logistic function?*  
+In general it is 
+![](http://mathworld.wolfram.com/images/equations/SigmoidFunction/NumberedEquation1.gif){width=50%}     
+In linear regression it is used to model how the probability p of an event may be affected by one or more explanatory variables.   
+<!-- [](https://wikimedia.org/api/rest_v1/media/math/render/svg/6f42e36c949c94189976ae00853af9a1b618e099)  -->
+*5. What is the relationship between predicted probabilities and predicted odds? *    
+odds = (p/(1-p))
+*6. What is a pseudo-R-square?*   
+It is an equvalent to R-square of linear regression (summarized proportion of variance in the dependent variable associated with the predictor variables) in logisitc regression that allows to assess a goodness-of-fit of a model. And there are different R-square: Cox and Snell's R-square, Nagelkerke's R, McFadden's R-square ([source1](https://stats.idre.ucla.edu/other/mult-pkg/faq/general/faq-what-are-pseudo-r-squareds/), [source2](https://www.ibm.com/support/knowledgecenter/en/SSLVMB_sub/spss/tutorials/plum_germcr_rsquare.html))   
+*7. How do you interpret the results of the logistic regression?*   
+We look at the coefficients of variables and p-value, is it significant or not. If variable reachs our level of significance, we can say, that it contributes in obervable variablity of data with power regarding coefficient.
+
+*******      
+
+##The simplest model - the Unconditional
+
+```{r, fig.align='center'}
+data(florentine, package='ergm')
+
+class(flomarriage)
+flomarriage
+# Of course, let's look at data first.
+# We've seen this image in 3-D a couple of weeks ago:
+display.brewer.pal(11,'RdYlBu')
+col20 <- c(brewer.pal(11,'RdYlBu'),brewer.pal(9,'RdYlBu')) 
+par(mar=c(1,1,1,1))
+wealth <- flomarriage %v% 'wealth'
+wealth
+# the %v% extracts vertex 
+plot(flomarriage, vertex.cex = wealth/25+1, vertex.col = col20) #
+```
+```{r descriptive stats}
+ #Also, let's look at couple of network statistics, we'll need them later for comparison:
+network.density(flomarriage)
+gtrans(flomarriage, mode = 'graph')
+
+```
+```{r log regression}
+# Command is simply ergm.
+# "edges" means we are adding edges. 
+flomodel.01 <- ergm(flomarriage ~ edges)
+summary(flomodel.01)
+
+invlogit <- function(x) {1/(1 + exp(-x))} 
+x<-coef(flomodel.01)
+invlogit(x)
+```
+
+##A model conditional on triangles
+
+
+Transitivity Index = n(Transitive triads) / n(Potentially transitive triads) = n(transitive triads)/n( transitive triadic closure) 
+Transitivity coefficient corresponds to the fraction of triads that are closed, that is the fraction of pairs of people with a common friend who are themselves friends, or equivalently, the mean probability that two people with a common friend are themselves friends.
+
+```{r}
+set.seed(0) # so we all start at the same place 
+flomodel.02 <- ergm(flomarriage ~ edges + triangle)
+summary(flomodel.02)
+```
+*******      
+
+_**Assignment task:**_ *Compute corresponding probabilities for the log-odds above. Are triangles significant in our model?*   
+Triangles in our model are not significant (p = 0.784).   
+log-odds = log(p/p-1) = beta0 + beta1*x...    
+p = exp(beta0 + beta1\*x...)/(1+ exp(beta0 + beta1\*x...))    
+
+
+1. If the tie will not add any triangles to the network, its log-odds is -1.6750, p = exp(-1.6750)/(1+exp(-1.6750)) = `r exp(-1.6750)/(1+exp(-1.6750))`.       
+2. If the tie will add one triangle to the network, its log-odds is -1.6750 + 0.1687 = `r -1.6750 + 0.1687`, p = exp(-1.5063)/(1+exp(-1.5063)) = `r exp(-1.5063)/(1+exp(-1.5063))`.      
+3. If the tie will add one triangle to the network, its log-odds is -1.6750 + 2*0.1687 = -1.3376, p = exp(-1.3376)/(1+exp(-1.3376)) = `r exp(-1.3376)/(1+exp(-1.3376))`.    
+
+```{r}
+exp(-1.6750)/(1+exp(-1.6750))
+plogis(coef(flomodel.02))
+
+plogis(coef(flomodel.02)[['edges']])
+
+exp(-1.5063)/(1+exp(-1.5063))
+exp(-1.3376)/(1+exp(-1.3376))
+```
+
+
+*******      
+
+##A closer look at the ERGM object
+
+```{r}
+flomodel.02
+class(flomodel.02) # check the class
+names(flomodel.02) 
+flomodel.02$coef
+flomodel.02$formula
+
+```
+
+*******      
+
+_**Assignment task:**_ *Explore the ERGM object on your own, testing at least 3-4 of the options you’ve generated with the names command. What have you learned?*
+
+
+```{r}
+head(flomodel.02$sample)
+flomodel.02$covar   
+flomodel.02$failure
+flomodel.02$network
+flomodel.02$newnetworks
+flomodel.02$reference
+flomodel.02$target.stats
+flomodel.02$estimate
+
+
+```
+flomodel.02$sample -- The n/times p matrix of network statistics, where n is the sample size and p is the number of network statistics specified in the model, that is used in the maximum likelihood estimation routine.    
+flomodel.02$covar -- Approximate covariance matrix for the MLE, based on the inverse Hessian of the approximated loglikelihood evaluated at the maximizer.
+flomodel.02$failure -- Did the MCMC estimation fail? (No)   
+flomodel.02$network -- Original network   
+flomodel.02$newnetworks -- The final network at the end of the MCMC simulation
+flomodel.02$reference -- A one-sided formula specifying the reference measure (h(y)) to be used. (Defaults to ~Bernoulli.)    
+flomodel.02$target.stats -- vector of "observed network statistics," if these statistics are for some reason different than the actual statistics of the network on the left-hand side of formula. Equivalently, this vector is the mean-value parameter values for the model.
+flomodel.02$estimate -- maximum pseudolikelihood estimator (PMLE) or approximate maximum likelihood estimator (MLE)
+
+*******      
+
+##Adding attributes
+
+Some terms taking nodal or dyadic covariates take optional transform and transformname arguments. transform should be a function with one argument, taking a data structure of the same mode as the covariate and returning a similarly structured data structure, transforming the covariate as needed.
+
+For example, nodecov("a", transform=function(x) x^2) will add a nodal covariate having the square of the value of the nodal attribute "a".
+
+In ergm to create a network object in R, use the network() function, then add nodal attributes to it using the %v% operator if necessary. Enclosing a model term in offset() fixes its value to one specified in offset.coef.
+
+```{r supervised part}
+flomodel.03 <- ergm(flomarriage~edges+nodecov('wealth'))
+summary(flomodel.03)
+```
+*******   
+
+_**Assignment task:**_ *Interpet the model results. Are the coefficients significant? How does each component affect the probability of forming a tie? Calculate the corresponding probabilities.*    
+
+Both variables, edges and transformed attributes (wealth) are significant, but edges is significant on more high level of significance.  
+
+1. Log-odds for ties is  -2.594929, that means log-odds ties decreases on 2.594929 with edges. Probablity form a tie is  p = exp(-2.594929)/(1+exp(-2.594929)) = `r exp(-2.594929)/(1+exp(-2.594929))`. 
+2. Log-odds for transformed wealth is 0.010546, that means log-odds ties increases on 0.010546 with increasing wealth on 1 unit. Probability form a tie according wealth is  p = exp(-2.594929+0.010546)/(1+exp(-2.594929+0.010546)) = `r exp(-2.594929+0.010546)/(1+exp(-2.594929+0.010546))`.  
+We can check using function in *stats* package, that calculates separate probabilities for each variable:
+
+```{r}
+plogis(coef(flomodel.03))
+
+```
+
+*******   
+
+##Adding mutuality
+
+```{r}
+data(samplk) # call the dataset 
+plot(samplk3) # take a look at the network
+
+```
+
+
+```{r}
+sampmodel.01 <- ergm(samplk3~edges+mutual)
+summary(sampmodel.01)
+```
+
+*******   
+
+_**Assignment task:**_ *Interpet the model results. Are the coefficients significant? How does each component affect the probability of forming a tie? Calculate the corresponding probabilities.* 
+
+
+Both variables, edges and mutual, are significant on the highest level of significance.   
+1. Log-odds for edges is -2.1535, probability to form a tie is p = exp(-2.1535)/(1+exp(-2.1535)) = `r exp(-2.1535)/(1+exp(-2.15359))`.    
+2. Log-odds for mutual is 2.2917, probability that tie will be mutual is p = exp(2.2917 )/(1+exp(2.2917 )) = `r exp(2.2917 )/(1+exp(2.2917 ))`. 
+
+
+```{r}
+plogis(coef(sampmodel.01))
+
+
+```
+*******   
+
+##Practicing the workflow
+
+```{r, fig.align='center'}
+data(faux.mesa.high)
+mesa <- faux.mesa.high
+mesa
+grd <- faux.mesa.high %v% "Grade"
+sx <- faux.mesa.high %v% "Sex"
+vs <- c(4, 12)[match(sx, c("M", "F"))]
+col <- c(6, 5, 3, 7, 4, 2)
+par(mar=c(0,0,0,0))
+plot(mesa, vertex.col='Grade') 
+legend('bottomleft',fill=7:12,legend=paste('Grade',7:12),cex=0.75)
+```
+
+
+```{r}
+table(mesa %v% 'Race')
+mixingmatrix(mesa, "Race")
+```
+
+```{r}
+#First, the unconditional model:
+model1 <- ergm(faux.mesa.high ~ edges)
+summary(model1)
+```
+
+
+*******   
+
+_**Assignment task:**_ *Interpet the model results. Are the coefficients significant? How does each component affect the probability of forming a tie? Calculate the corresponding probabilities. Can you calculate the density based on the unconditional test?* 
+
+
+Edges is significant variable on the highest level of significance.   
+Log-odds for edges is -4.62502, probability to form a tie is p = exp(-4.62502)/(1+exp(-4.62502)) = `r exp(-4.62502)/(1+exp(-4.625029))`.    
+This unconditional probability is actually density of tenwork:
+
+```{r}
+network.density(mesa)
+exp(-4.62502)/(1+exp(-4.625029))
+```
+
+*******   
+
+```{r}
+model2 <- ergm(faux.mesa.high ~ edges + nodematch("Grade", diff = TRUE) + nodefactor("Sex"))
+summary(model2)
+```
+
+```{r}
+model2a <- ergm(faux.mesa.high ~ edges + nodematch("Grade") + nodefactor("Sex"))
+summary(model2a)
+```
+
+*******   
+
+_**Assignment task:**_  *Build model3, now using the nodefactor(“Race”), first differentiating races, and then not, as we did with sex above. Which model is better?*    
+
+```{r}
+
+model3 <- ergm(faux.mesa.high ~ edges + nodematch("Race", diff = TRUE) + nodefactor("Sex"))
+summary(model3)
+model3a <- ergm(faux.mesa.high ~ edges + nodematch("Race") + nodefactor("Sex"))
+summary(model3a)
+```
+Model3a is better than moddel3 because AIC and BIC for it is lower.
+
+*Interpet the model results. Are the coefficients significant? How does each component affect the probability of forming a tie? Calculate the corresponding probabilities.*
+
+For model 3a:   
+All are significant.      
+1. Log-odds for edges is -4.4577, probability to form a tie is p = exp(-4.4577)/(1+exp(-4.4577)) = `r exp(-4.4577)/(1+exp(-4.4577))`.    
+2. Log-odds for nodematch.Race is 0.4484, probability that tie will be mutual is p = exp(0.4484 )/(1+exp(0.4484)) = `r exp(0.4484)/(1+exp(0.4484))`.    
+3. Log-odds for nodefactor.Sex.M is 2.2917, probability that tie will be mutual is p = exp( -0.3942)/(1+exp( -0.3942)) = `r exp( -0.3942)/(1+exp( -0.3942))`.    
+
+
+[Thanks for the nice ERGM tutorial on this link](http://michaellevy.name/blog/ERGM-tutorial/)
+

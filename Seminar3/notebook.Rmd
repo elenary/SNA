@@ -1,0 +1,455 @@
+---
+title: "Homework2"
+author: "Elena Rybina 'MKH 161'"
+date: "1/24/2018"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r libraries, echo = FALSE, message=F, warning=FALSE}
+#install.packages('igraph')
+#install.packages('sna')
+#install.packages('network')
+library('igraph')
+#detach(package:sna) 
+#detach(package:network)
+```
+    
+    
+## Data loading
+```{r, echo = TRUE,  include = TRUE}
+load('trade.Rdata')
+```
+POP_GROWTH -- average population growth between 1970 and 1981    
+GNP -- GNP growth per capita over the same period   
+SCHOOLS -- secondary school enrollment ratio in 1981    
+ENERY -- energy consumption in 1981 (in kilo coal equivalents per capita)
+
+*trade.all*, is simply a sum of all other matrices - in other words, it is a **valued matrix** that contains in the cells the number, indicating how many different flows (manufacture, food, crude, etc.) go from country A to country B. Other matrices are 0-1 matrices, indicating whether the ties are present
+******    
+
+_**Assignment questions**_. *Please examine available matrices and answer the following questions:*     
+*1. Are the matrices symmetric?*    
+*2. What does that mean for resulting networks? Would they be directed or undirected?*
+
+```{r}
+isSymmetric(as.matrix(crude))
+isSymmetric(as.matrix(diplomacy))
+isSymmetric(as.matrix(food))
+isSymmetric(as.matrix(manufacture))
+isSymmetric(as.matrix(minerals))
+isSymmetric(as.matrix(trade.all))
+```
+
+As we can see all our matrixes are not symmetric. It means that our networks will be directed.    
+
+******    
+
+## Dichotomizing valued data   
+
+Calcuating geodesic distances in some cases assumes that the network is binary, you can’t find this measure on a valued network.
+
+We should keep in mind:
+1. Whether there is a theoretical justification for the cut-off we selected, and    
+2. What are the impirical implications of this cut-off.
+
+```{r dichotomizing}
+trade.all<-as.matrix(trade.all)
+trade.any <- ifelse(trade.all > 0, 1, 0)
+trade.2 <- ifelse(trade.all > 1, 1, 0)
+trade.max <- ifelse(trade.all == 5, 1, 0)
+```
+******
+_**Assignment questions.**_ *With respect to the above actions, please answer the following:*   
+*1. How would you justify any of these choices? Please refer to specific social theories to make your answer more legitimate.*    
+*2. What are the impirical implication of these choices?*   
+
+In is a difficult and contriversial question how to dichotomize or convert data in any other scale ([discussion about controversion](http://allenfleishmanbiostatistics.com/Articles/2011/12/9-dichotomization-as-the-devils-tool/). In psychological or biologocal studies one of possible ways is to split data at the median <https://www.ncbi.nlm.nih.gov/pmc/articles/PMC1458573/>. I haven't good enough understanding of trades for choosing the most appropriate way, and I think it depends on our goals. If we are interested in question do countries establish the most productive trade we use *trade.max* dichotomization. If we are interested in question do countries establish at least one trade in principle, we use *trade.any* dichotomization.  
+
+******    
+
+## Package igraph
+
+```{r, fig.align='center'}
+tradegraph.any <-graph.adjacency(trade.any, mode=c("directed"), weighted=NULL,diag=FALSE)
+tradegraph.2 <-graph.adjacency(trade.2, mode=c("directed"), weighted=NULL, diag=FALSE)
+tradegraph.max <-graph.adjacency(trade.max, mode=c("directed"), weighted=NULL, diag=FALSE)
+
+par(mar=c(0,0,0,0))
+plot(tradegraph.any, vertex.size = 8, edge.arrow.size = .2, vertex.label.cex = .5, vertex.color = 'aquamarine4',
+     edge.color='red', vertex.shape = 'circle', vertex.label.dist = .5, vertex.label.color = 'black')
+# plot(tradegraph.2, vertex.size = 8, edge.arrow.size = .2, vertex.label.cex = .5, vertex.color = 'aquamarine4',
+#      edge.color='red', vertex.shape = 'circle', vertex.label.dist = .5, vertex.label.color = 'black')
+# plot(tradegraph.max, vertex.size = 8, edge.arrow.size = .2, vertex.label.cex = .5, vertex.color = 'aquamarine4',
+#      edge.color='red', vertex.shape = 'circle', vertex.label.dist = .5, vertex.label.color = 'black')
+plot(tradegraph.2, vertex.size = 10, edge.arrow.size = .2, vertex.label.cex = .5, vertex.color = 'red',
+      edge.color='black', vertex.shape = 'circle', vertex.label.dist = .5, vertex.label.color = 'black')
+plot(tradegraph.max, vertex.size = 6, edge.arrow.size = .3, edge.color='gray', vertex.label.cex = .5, 
+      vertex.color = 'yellow', vertex.shape = 'crectangle', vertex.frame.color = 'green', 
+      vertex.label.dist = .5, vertex.label.color = 'black')
+
+```
+******
+_**Assignment questions.**_ *Irrespective of all the color/shape variations that are hurting your eyes (but at the same time show you the capabilities of the package), please answer the following questions:*    
+*1. What differences do you observe between the graphs where the cutpoint is any tie, at least two ties, and all ties present?*    
+*2. What information can you gather from these observed differences to help you expand on your earlier theoretical justification of ties? Alternatively, does your theoretical justification seem reasonable in light of new information obtained from these graphs?*   
+
+Obviously, all these graphs differ from each other in the number of ties. That is quite logical because during dichotomizing we provided our matrices different amount of ones and zeros.    
+So, justification and choosing an appropriate number of ties according to the purpose of the research seems reasonable.
+
+******
+
+## Directed to undirected network
+```{r, echo = FALSE, message=F, warning=FALSE}
+library('network')
+detach(package:igraph)
+```
+
+```{r, fig.align='center'}
+par(mar=c(0,0,0,0))
+tradenet.sym.2<- network(trade.2, directed=FALSE) 
+plot(tradenet.sym.2, displaylabels=TRUE, label.cex =.5, edge.col = 'gray60')
+tradenet.nonsym.2 <- network(trade.2) 
+plot(tradenet.nonsym.2, displaylabels=TRUE, label.cex =.5, edge.col = 'gray60')
+tradenet.nonsym.2 <- network(trade.2, directed=TRUE) 
+plot(tradenet.nonsym.2, displaylabels=TRUE, label.cex =.5, edge.col = 'gray60')
+```
+```{r, all networks statistics}
+tradenet.any<-as.network(trade.any) 
+tradenet.max <- as.network(trade.max)
+network.density(tradenet.any)
+network.density(tradenet.sym.2)
+network.density(tradenet.nonsym.2)
+network.density(tradenet.max)
+```
+
+```{r, echo = FALSE, message=F, warning=FALSE}
+library('igraph')
+detach(package:network)
+```
+
+```{r}
+diameter(tradegraph.any)
+diameter(tradegraph.2)
+diameter(tradegraph.max)
+```
+******
+
+_**Assignment question.**_ *Of course, there are differences between directed and undirected networks on the graph and with stats. Please answer the following questions:*   
+*1. What are the differences in graphs and how would you interpret them?*   
+*2. What are the differences in centrality?*    
+*3. what is the diameter and how do you expect it to wary?*   
+
+
+Obviously, the main difference between directed and undirected graphs that we can see on the graph itself is presence or absence of arrows. Option *directed=FALSE / TRUE* of *'network'* function allows us to establish undirected (without arrows) or directed (with arrows) graph. By default, any graph is directed.    
+The directed graph has less density (0.67) than directed one (0.75). It means that directed graph has less number of the ties per node relative to all possible connections. For calculation centrality, we have to focus on particular nodes. Here we can say only about the average amount of ties on one dyad.    
+Diameter is the largest geodesic distance within the graph between any pair of nodes. In other words, the max number of ties in the shortest path from one node to another in the graph. Again, depending on the number of ties in the network we obtained different diameters. It is logical that the biggest diameter is in the network where we used the most restricted rule for the assignment ties.    
+
+******
+
+## Components
+
+```{r, echo = FALSE, message=F, warning=FALSE}
+detach(package:igraph)
+library('sna')
+```
+
+```{r components}
+components(tradenet.any)
+components(tradenet.sym.2)
+components(tradenet.nonsym.2)
+components(tradenet.max)
+```
+******
+
+_**Assignment question.**_ *What are the differences between the three networks? How would you explain them from the theoretical level?*   
+
+If this question relates to components I would say that networks *tradenet.any* and *tradenet.sym.2* / *tradenet.nonsym.2* are equal in amount of separated subgraphs and network *tradenet.max* is differ from it. Again, it can be explained through the most restricted rule in dichotomization and assign of ties when this network obtained the least amount of ties.    
+If this question relates to general differences, the answer was done earlier.
+
+******
+
+## Geodesic distances
+
+```{r Geodesic distances}
+geo.dist.undir <-geodist(tradenet.sym.2) #for symmetric network 
+geo.dist.dir <-geodist(tradenet.nonsym.2) # for directed network 
+summary(geo.dist.undir)
+summary(geo.dist.dir)
+
+```
+
+## Centrality
+
+```{r Centrality, fig.align='center'}
+tradenet.valued <- as.network(trade.all,directed=TRUE) 
+trade.att.valued <- trade.att #load attributes
+
+# Degree centrality:
+indegree.valued <- degree(tradenet.valued, 
+                   gmode = 'digraph', 
+                   #gmode = 'graph', # mode can be graph (for undirected) or digraph 
+                   diag = FALSE,
+                   cmode = 'indegree',
+                   rescale = FALSE,
+                   ignore.eval = FALSE)
+
+
+indegree.unvalued <- degree(tradenet.valued, 
+                    gmode = 'digraph',
+                    diag = FALSE,
+                    cmode = 'indegree',
+                    rescale = FALSE,
+                    ignore.eval = TRUE)
+
+indegree.unvalued.any <- degree(tradenet.any, 
+                    gmode = 'digraph',
+                    diag = FALSE,
+                    cmode = 'indegree',
+                    rescale = FALSE,
+                    ignore.eval = TRUE)
+
+indegree.unvalued.any <- degree(tradenet.any, 
+                    gmode = 'digraph',
+                    diag = FALSE,
+                    cmode = 'indegree',
+                    rescale = FALSE,
+                    ignore.eval = TRUE)
+
+indegree.unvalued.max <- degree(tradenet.max, 
+                    gmode = 'digraph',
+                    diag = FALSE,
+                    cmode = 'indegree',
+                    rescale = FALSE,
+                    ignore.eval = TRUE)
+
+
+
+par(mar=c(2,2,2,2),mfrow=c(2,2)) 
+hist(indegree.valued)
+hist(indegree.unvalued)
+hist(indegree.unvalued.any)
+hist(indegree.unvalued.max)
+```
+
+******
+
+_**Assignment question.**_ *Is there a difference between valued data and non-valued data for degree centrality? Why?*   
+
+Here there is no difference between histograms of degrees *indegree.valued* and *indegree.unvalued*. But I also plotted histograms for degrees of networks *tradenet.any* and *tradenet.max*. And as we can see, histogram of degrees *indegree.unvalued.any* is equal to our source histograms *indegree.valued* and *indegree.unvalued*.But *indegree.unvalued.max* is differ from it.    
+So, I can conclude that function *degree* of *sna* package conducts dichotomization according to assign to 1 any edge value different from 0 when we ask it do not ignore edge value (option *ignore.eval = FALSE*)    
+
+******
+
+```{r, fig.align='center'}
+outdegree <- degree(tradenet.valued, 
+                    gmode = 'digraph',
+                    diag = FALSE,
+                    cmode = 'outdegree',
+                    rescale = FALSE)
+# Freeman's degree (in + out):
+degree.f <- degree(tradenet.valued, 
+                   gmode = 'digraph',
+                   diag = FALSE,
+                   cmode = 'freeman',
+                   rescale = FALSE) 
+
+hist(degree.f)
+```
+
+```{r Betweenness, fig.align='center'}
+# Betweenness
+between.dir <- betweenness(tradenet.valued, 
+                       gmode = 'digraph',
+                       diag = FALSE,
+                       cmode = 'directed')
+# Let's experiment with cmode and plot histograms:
+
+between.undir <- betweenness(tradenet.valued, 
+                         gmode = 'digraph',
+                         diag = FALSE,
+                         cmode = 'undirected')
+
+between.endpoints <- betweenness(tradenet.valued, 
+                           gmode = 'digraph',
+                           diag = FALSE,
+                           cmode = 'endpoints')
+
+between.proximalsrc <- betweenness(tradenet.valued, 
+                             gmode = 'digraph',
+                             diag = FALSE,
+                             cmode = 'proximalsrc')
+
+par(mar=c(2,1,2,1),mfrow=c(2,2)) 
+hist(between.dir)
+hist(between.undir)
+hist(between.endpoints)
+hist(between.proximalsrc)
+```
+
+```{r Closeness, fig.align='center'}
+#Closeness
+close <- closeness(tradenet.valued, 
+                   gmode = 'digraph',
+                   # gmode ='graph',
+                   diag = FALSE,
+                   cmode = 'directed',
+                   rescale = FALSE)
+#Eigenvalue
+eigen <- evcent(tradenet.valued, 
+                gmode = 'digraph',
+                diag = FALSE,
+                rescale = FALSE)
+
+par(mar=c(2,1,2,1),mfrow=c(1,2)) 
+hist(close)
+hist(eigen)
+```
+
+
+******    
+
+_**Assignment question.**_ *Why do some of centrality histograms look the same while others look so different? What do they each show us?*   
+
+We have already considered different degrees histograms.    
+Plotting different betweenness histograms we used different modes of calculation. Three of them implies directed edges (*between.dir*, *between.endpoints*, *between.proximalsrc*) and look almost the same with exception that *between.endpoints* calculates more connections (based on assumption that nodes are actually linked not only with their own direct contacts) . The *between.endpoints* calculates betweenness on undirected connections and looks different.  
+
+******
+
+```{r all centrality metrics in attribute df}
+#all centrality metrics in df
+trade.att.valued <- cbind(trade.att.valued, indegree.valued, outdegree, degree.f, between.dir, close, eigen)
+class(trade.att.valued)
+names(trade.att.valued)
+```
+
+
+## Centrality at the graph level
+
+```{r}
+centralization(tradenet.valued, FUN ='degree', normalize = TRUE)
+centralization(tradenet.valued, FUN ='betweenness', normalize = TRUE)
+centralization(tradenet.valued, FUN ='closeness', normalize = TRUE)
+centralization(tradenet.valued, FUN ='evcent', normalize = TRUE)
+
+```
+
+******    
+
+_**Assignment question.**_ *What do indexes above mean? What do they tell us about our network?*   
+
+If this question refers to the index in square brakets *[1]* it means the number of elements in R with which returned row is started.    
+If the question is about returned numbers they mean centralization level, the measure of the centrality of nodes on the network based on their degrees. The larger it is the more likely that a particular single node in the center of the network and the remaining nodes are far away from the center.   
+
+******
+
+## Final assignment task    
+*There are several networks in the “trade.Rdata” file, described above. We have fully explored the “trade.all” network. Now, select one of the individual trade networks (manufacture, food, crude, etc.) and show me everything you’ve learned in this class so far. At the very minimum, please do the following:*
+*1. Create an appropriate graph with all possible options.*   
+*2. Generate all possible network measures.*    
+*3. Tell me what inferences you can make about your selected network based on the information you’ve obtained. Supplement your arguments with logic and theory.*   
+
+Let's use *minerals* data frame
+
+```{r, echo = FALSE, message=F, warning=FALSE}
+
+library('igraph')
+library('RColorBrewer')
+detach(package:sna) 
+detach(package:network)
+```
+
+```{r, echo = TRUE, include=TRUE, fig.align='center'}
+class(minerals)
+minerals.igraph <-graph.adjacency(as.matrix(minerals), mode=c("directed"), weighted=NULL, diag=FALSE)
+
+#plotting igraph 
+par(mar=c(0,0,0,0), mfrow=c(1,2))
+display.brewer.pal(11, 'Spectral')
+display.brewer.pal(9, 'Greys')
+colors_spectr <- brewer.pal(11, 'Spectral')
+colors_greys <- brewer.pal(9, 'Greys')
+plot(minerals.igraph, 
+     vertex.size = 6, 
+     edge.arrow.size = 0.2, 
+     vertex.label.cex = 0.5,
+     vertex.color = colors_spectr[9],
+     edge.color=colors_greys[3], 
+     vertex.shape = 'circle', 
+     vertex.label.dist = 1, 
+     vertex.label.degree = 5,
+     vertex.label.font = 1,
+     vertex.label.color = 'black', 
+     lty=2,
+     curved = TRUE)
+
+
+```
+
+```{r, echo = FALSE, message=F, warning=FALSE}
+detach(package:igraph) 
+library('sna')
+library('network')
+
+```
+
+```{r desciptive stat, echo = TRUE, include=TRUE}
+
+
+minerals.net <- as.network(minerals, directed = TRUE)
+network.size(minerals.net)
+network.edgecount(minerals.net)
+network.dyadcount(minerals.net)
+network.density(minerals.net)
+
+```
+
+
+```{r centrality stat}
+#geodesic distances
+summary(geodist(minerals.net))
+#indegree
+min.indegree <- degree(minerals.net, gmode = 'digraph', diag = FALSE, cmode = 'indegree', rescale = FALSE, ignore.eval = TRUE)
+min.indegree
+#outdegree
+min.outdegree <- degree(minerals.net, gmode = 'digraph', diag = FALSE, cmode = 'outdegree', rescale = FALSE, ignore.eval = TRUE)
+min.outdegree
+#full degree
+min.fulldegree <- degree(minerals.net, gmode = 'digraph', diag = FALSE, cmode = 'freeman', rescale = FALSE, ignore.eval = TRUE)
+min.fulldegree
+
+par(mar=c(3,3,3,3), mfrow=c(1,3))
+hist(min.indegree)
+hist(min.outdegree)
+hist(min.fulldegree)
+
+# Betweenness
+min.between <- betweenness(minerals.net, gmode = 'digraph', diag = FALSE, cmode = 'directed')
+min.between
+summary(min.between)
+hist(min.between)
+
+# centralization
+centralization(minerals.net, FUN ='betweenness', normalize = TRUE)
+
+#closeness
+
+min.closeness <- closeness(minerals.net, gmode = 'digraph', diag = FALSE, cmode = 'directed',  rescale = FALSE)
+min.closeness
+summary(min.closeness)
+hist(min.closeness)
+
+```
+
+
+We can see how many connections in terms of minerals trades this network has and each particular country has.   
+It has no so tight density (0.24) in established connections per country.   
+The interesting issue is degrees, inputs and outputs: the biggest amount of countries has very little amount of inputs and outputs and weak connections, but several trades a lot. It is interesting to clarify which contries are, do they same in inputs in outputs? (next time )    
+Also we can see that United States has the biggest betweenness and closeness parametres.
+
+

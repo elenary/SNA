@@ -1,0 +1,268 @@
+---
+title: "Seminar 7"
+author: "Elena Rybina 'MKH 161'"
+date: "3/01/2018"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+```{r libraries, echo = FALSE, message=F, warning=FALSE}
+#install.packages("NetData")
+# install.packages("nFactors")
+# install.packages("lattice")
+library('NetData')
+library(network)
+library(sna)
+library(RColorBrewer) 
+library(NetData)
+library(nFactors)
+#detach(package:sna) 
+
+```
+##Working with data
+
+******        
+
+_**Assignment task.**_
+*1. Please carefully look at the Questinnaire. For the employees, questions were broken down into groups, and groups were even named - those are factors that we can analyze using Factor Analysis. Which of these factors could be used for good dependent variables? Why?*   
+I suppose, in general it would be interseting to check dependance of more personal characteristics from features of work. For example, "Responsibility" and "Speed of work" could depend on type of job, its amount and complexity of job. 
+Probably, in factor analysis personal features will represent one or more separate factors, and features of work will form another ones, for instance, complexity and amount -- one factor about job itself, "Administrative problems", "Interpersonal onflicts", "Roles conflicts" -- another factor about conflicts etc.   
+
+*2. Please examine the supervisor’s questionnaire. In there, questions were not grouped (by the way, can you tell the reason why?). Look at questions carefully, and using face validity, try to determine which questions would form separate and theoretically justifiable factors.*   
+In the boss questionnaire questions consistently form some factors like a: reliability of employee [Q 1-3], working capacity [4-5], responsibility [6-12, 15], ability to overtime work [16-19], teamwork [20-23], initiative [24-23, 34-36].
+
+
+******        
+##The attributes file 
+
+```{r}
+ocb_att<-read.csv('ocb_att.csv', header=TRUE, sep = ';')
+age<-ocb_att$Age
+sex<-ocb_att$Sex
+tenure<-ocb_att$WorkTitleYear+ocb_att$WorkTitleMonth/12
+tenure
+tenure_org<-ocb_att$WorkOrgYear+ocb_att$WorkOrgMonth/12
+tenure_sup<-ocb_att$RepSupYear+ocb_att$RepSupMonth/12
+
+# Set of dummies for education:
+ed1<-ifelse(ocb_att$Education==3,1,0) # this is for secondary specialized 
+ed2<-ifelse(ocb_att$Education==4,1,0) # this is higher
+ed1
+ed2
+
+#Physical participation variable
+phys_part<-rowMeans(cbind(ocb_att$Q30,ocb_att$Q31,ocb_att$Q32,ocb_att$Q33),na.rm=TRUE)
+phys_part
+```
+******        
+
+_**Assignment task:**_ *Create a dummy set for work title.*
+
+Actually work title coded in years and monthes is already invoved in our model (as *tenure* variable). And this is good variable for linear regression because it is coded in numeric scale, and dummization is useless. But here just random spliting onto those who has been working more than 1 year and less than 1 year.
+
+```{r}
+worltitle_dummy1<-ifelse(tenure>=1,1,0) 
+worltitle_dummy1
+worltitle_dummy2<-ifelse(tenure<1,1,0) 
+worltitle_dummy2
+
+```
+
+******        
+
+##Basic regression
+
+```{r regression}
+
+cor_mat<-cbind(phys_part,age, sex, tenure, tenure_org, tenure_sup, ed1, ed2) 
+cor(cor_mat)
+
+
+ lmout<-lm(phys_part~age+sex+tenure+tenure_org+tenure_sup+ed1+ed2) 
+ summary(lmout)
+
+ 
+ #dropped nin significant variables
+lmout<-lm(phys_part~tenure+tenure_sup) 
+summary(lmout)
+```
+******       
+
+_**Assignment task:**_ *Test your dummy work title set in the regression above. Do you get anything worthwhile?*
+
+```{r}
+ lmout2<-lm(phys_part~age+sex+tenure_org+tenure_sup+ed1+ed2+worltitle_dummy1+worltitle_dummy2) 
+ summary(lmout2)
+```
+In current model we removed *tenure* variable as it is and replaced it on dummy variable.  
+But we've obtained singularity error: it means that one of our variable (dummy variable) is linear combination of anothers and this variable is redundant. It often happens with coding dummy variables. Here we actually don't need any dummization and can use tenure as it is, but for categorical bariables is better to use factors.
+
+******       
+
+##Adding network variables as predictors
+
+```{r}
+all_net<-read.csv('allnet.csv', header=TRUE, row.names = 1, sep = ';')
+all_mat<-as.matrix(all_net)
+```
+
+```{r, fig.align='center'}
+all_network<-as.network(all_mat, directed=TRUE)
+plot(all_network)
+```
+    
+We will use cetrality measures  as predictors (network variables)
+```{r}
+
+#Create vectors of network measures:
+geo.dist<-geodist(all_network)
+
+indegree <- degree(all_network, gmode = 'digraph', diag = FALSE, cmode = 'indegree',
+rescale = FALSE, ignore.eval = FALSE)
+outdegree <- degree(all_network, gmode = 'digraph', diag = FALSE, cmode = 'outdegree',
+rescale = FALSE, ignore.eval = FALSE)
+degree.f <- degree(all_network, gmode = 'digraph', diag = FALSE, cmode = 'freeman',
+rescale = FALSE, ignore.eval = FALSE)
+between <- betweenness(all_network, gmode = 'digraph', diag = FALSE, cmode = 'directed')
+close <- closeness(all_network, gmode = 'digraph', diag = FALSE, cmode = 'directed', rescale = FALSE) 
+eigen <- evcent(all_network, gmode = 'digraph', diag = FALSE, rescale = FALSE)
+```
+
+
+```{r libraries 2, echo = FALSE, message=F, warning=FALSE}
+detach(package:sna) 
+detach(package:network) 
+library(igraph)
+```
+nalyze model only on who answered questionarrie (68), but claculate measures on all nodes (122)
+
+```{r}
+all_graph<-graph_from_adjacency_matrix(all_mat) #create a graph
+all_graph
+
+
+names<-ocb_att$Name # pull the names out of attributes dataset 
+gender_vector<-vector() #create a vector for gender
+
+
+# Next, run a double-loop and assign gender to a corresponding node:
+for(i in 1:122){ # this is our set of all network nodes
+for(j in 1:68){ # this is our set of attribute-containing nodes
+# for each node in i, we run through all node in j # and compare names 
+  if(V(all_graph)$name[i]==names[j]){
+      #if we match, we add the attribute to a vector
+           gender_vector[i]<-sex[j]
+           # and exit the inner loop for the next i
+break;}
+# if not, we are assigning a missing value
+# and keep going until we find a matching node 
+  else{gender_vector[i]<-NA}
+} }
+# Let's look at the result:
+gender_vector
+
+```
+
+```{r, fig.align='center'}
+all_graph<-set_vertex_attr(all_graph, 'gender', value=c(gender_vector))
+
+colors<-ifelse(gender_vector==1,"palevioletred", ifelse(gender_vector==0,"royalblue2","gray")) 
+par(mar=c(0,0,1,0))
+plot(all_graph, vertex.size=6.5, vertex.color=colors, edge.arrow.size=.2, edge.color="black", vertex.label=NA, main="Meaningless Network of AllNet")
+```
+
+```{r}
+# Create vectors first
+v_geodist<-vector() 
+v_indegree<-vector() 
+v_outdegree<-vector() 
+v_degree.f<-vector() 
+v_between<-vector() 
+v_close<-vector() 
+v_eigen<-vector()
+
+for(i in 1:122){
+     for(j in 1:68){
+if(V(all_graph)$name[i]==names[j]){ 
+v_geodist[j]<-geo.dist[i]
+v_indegree[j]<-indegree[i]
+v_outdegree[j]<-outdegree[i]
+v_degree.f[j]<-degree.f[i]
+v_between[j]<-between[i]
+v_close[j]<-close[i]
+v_eigen[j]<-eigen[i]
+
+break;}
+         else{}
+} }
+
+```
+
+
+
+```{r}
+# It helps to look at correlations:
+cor_mat<-cbind(phys_part,tenure,tenure_sup,v_indegree, v_degree.f,v_between,v_eigen) 
+cor(cor_mat)
+```
+
+
+```{r}
+library(leaps)
+```
+
+```{r}
+# You will need to install package "leaps"
+
+# Create a matrix of all x-variables
+X.full <- cbind(tenure, tenure_org, tenure_sup, age, sex,
+  v_indegree,v_outdegree, v_between, v_eigen)
+# Rename DV, it's messy
+y<-phys_part
+# Use build-in function to generate the combinations of variables
+a <- leaps(X.full,y)
+a
+```
+
+```{r}
+# This is the calculation of PRESS residuals
+# I can walk you through it if you are interested :
+
+my.press.1 <- rep(0,79)
+my.press.2 <- rep(0,79)
+for(i in 1:79){
+X <- cbind(1,X.full[,a$which[i,]]) 
+H <- X%*%solve(t(X)%*%X)%*%t(X) 
+y.predict <- H%*%y
+hat.element <- diag(H)
+my.press <- (y-y.predict)/(1-hat.element) 
+my.press.1[i] <- sum(my.press^2) 
+my.press.2[i] <- sum(abs(my.press))
+}
+```
+
+```{r}
+# Calculate R-square for each combination
+a.r2 <- leaps(X.full,y,method="r2")$r2
+a.adjr2 <- leaps(X.full,y,method="adjr2")$adjr2 
+a.Cp <- leaps(X.full,y,method="Cp")$Cp
+# Create a table with all outputs
+model.sel <- cbind(a$which,a.r2,a.adjr2, a.Cp,my.press.1,my.press.2)
+options(digits=3)
+# Print the resulting combination to search through 
+# In the model, the first 9 columns
+# show combinations of x-variables in the model 
+model.sel
+```
+
+```{r}
+ lmout<-lm(phys_part~tenure+tenure_sup+v_indegree+v_outdegree+ v_between+v_eigen)
+summary(lmout)
+```
+
+```{r}
+lmout<-lm(phys_part~tenure+tenure_sup+v_between)
+summary(lmout)
+```
+

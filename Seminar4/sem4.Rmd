@@ -1,0 +1,244 @@
+---
+title: "Seminar 4"
+author: "Elena Rybina 'MKH 161'"
+date: "1/24/2018"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+
+```{r libraries, echo = FALSE, message=F, warning=FALSE}
+#install.packages('RColorBrewer')
+#install.packages('sna')
+library('RColorBrewer')
+#library('sna')
+#library('network')
+library('igraph')
+```
+
+```{r, echo = T, include = T}
+#switch without switching work directory
+wd <- getwd()
+wd
+SWFile <- "/SouthernWomen/SouthernWomen.tsv" #this is the name of the file
+SWFilePath <- paste(wd, SWFile, sep = "")
+SWFilePath
+
+SWrawdata<-read.table(SWFilePath, sep = "\t", header = TRUE, row.names = 1) 
+SWrawdata
+
+```
+
+******
+_**Assignment task.**_ *In your Seminar 4 folder, there is another file with data, HiTech. Create the code that will do the following:*   
+* *Create a directory that will consist of a working directory name and the HiTech folder name, so that it opens the HiTech folder.*   
+* *Create file paths to separate data files "GivesAdviceTo," "IsFriendOf," "ReportsTo," and "HiTechAtt.* 
+
+
+```{r, echo = T, include = T}
+HTfolder <- '/HiTech/'
+HTchunk <- 'HiTech - '
+HT1 <- 'GivesAdviceTo.tsv'
+HT2 <- 'HiTechAtt.tsv'
+HT3 <- 'IsFriendOf.tsv'
+HT4 <- 'ReportsTo.tsv'
+HTpath1 <- paste0(wd, HTfolder, HTchunk, HT1)
+HTpath2 <- paste0(wd, HTfolder, HTchunk, HT2)
+HTpath3 <- paste0(wd, HTfolder, HTchunk, HT3)
+HTpath4 <- paste0(wd, HTfolder, HTchunk, HT4)
+
+HTadvices <- read.table(HTpath1, sep = "\t", header = TRUE, row.names = 1)
+head(HTadvices)
+HTatt <- read.table(HTpath2, sep = "\t", header = TRUE, row.names = 1)
+head(HTatt)
+HTfriends <- read.table(HTpath2, sep = "\t", header = TRUE, row.names = 1)
+head(HTfriends)
+HTreports <- read.table(HTpath2, sep = "\t", header = TRUE, row.names = 1)
+head(HTreports)
+```
+
+******    
+```{r, echo = FALSE, message=F, warning=FALSE}
+detach(package:network)
+#detach(package:sna)
+library('igraph')
+
+```
+
+
+```{r, fig.align='center'}
+SWnet <- graph_from_incidence_matrix(SWrawdata)
+SWnet
+par(mar=c(0,0,0,0))
+plot(SWnet)
+```
+
+```{r, fig.align='center'}
+
+V(SWnet)
+V(SWnet)[1]
+V(SWnet)[[1]]
+get.vertex.attribute(SWnet)
+
+V(SWnet)$type
+V(SWnet)$name
+
+
+E(SWnet)
+E(SWnet)[1]
+E(SWnet)[[1]]
+
+
+```
+
+```{r, fig.align='center'}
+brewer.pal.info
+display.brewer.pal(12, 'Set3')
+display.brewer.pal(9, 'Greys')
+colorsSet3 <- brewer.pal(12, 'Set3')
+colorsGreys <- brewer.pal(9, 'Greys')
+V(SWnet)$color <- c(colorsSet3[1],colorsSet3[6])[V(SWnet)$type+1]
+V(SWnet)$shape <- c("circle", "square")[V(SWnet)$type+1]
+V(SWnet)$label.color<-c(colorsGreys[9], colorsGreys[7])[V(SWnet)$type+1]
+V(SWnet)$label.cex<-0.5
+
+V(SWnet)$indegree <- degree(SWnet, mode = "in") 
+V(SWnet)$size<-ifelse(V(SWnet)$type==TRUE,V(SWnet)$indegree*3,15)
+par(mar=c(0,0,0,0))
+plot(SWnet, rescale = T, layout = layout_with_fr)
+
+
+
+```
+
+```{r, fig.align='center'}
+V(SWnet)$shape <- "none"
+V(SWnet)$color <- c(colorsSet3[1],colorsSet3[11])[V(SWnet)$type+1]
+V(SWnet)$label.cex<-ifelse(V(SWnet)$type==TRUE,0.25+V(SWnet)$indegree/10,0.4)
+
+par(mar=c(0,0,0,0))
+plot(SWnet, layout = layout.bipartite)
+
+```
+
+
+******    
+
+_**Assignment task.**_ *Apparently, creating such graph is not as easy as it looks! You give it a try. Using the plotting function in igraph, improve my graph for the SouthernWomen data by changing at least three characteristics of the graph.*    
+
+
+
+```{r, fig.align='center'}
+display.brewer.pal(11, 'Spectral')
+colorsSpectr <- brewer.pal(11, 'Spectral')
+V(SWnet)$shape <- c("none", "sphere")[V(SWnet)$type+1]
+V(SWnet)$color <- c(colorsSet3[1],colorsSet3[11])[V(SWnet)$type+1]
+V(SWnet)$label.cex<-ifelse(V(SWnet)$type==TRUE,0.25+V(SWnet)$indegree/10,0.4)
+V(SWnet)$label.color <- c(colorsSpectr[1],colorsSpectr[11])[V(SWnet)$type+1]
+V(SWnet)$label.font=1
+#V(SWnet)$label.degree = 0
+E(SWnet)$color <- colorsGreys[2]
+
+par(mar=c(0,0,0,0))
+plot(SWnet, rescale = T, layout = layout.bipartite, edge.curved=F, 
+     ylim=c(-1,1),xlim=c(-0.75,0.75), asp = 0
+     )
+
+```
+
+****** 
+
+```{r}
+Women.only<-as.matrix(SWrawdata)%*%t(as.matrix(SWrawdata)) # Matrix of women only
+Events.only<-t(as.matrix(SWrawdata))%*%as.matrix(SWrawdata) # Matrix of events only
+```
+
+******    
+
+_**Assignment task.**_ *Display the contents of the Women.only and Events.only matrices we created above.*
+* *Explain what data in these matrices mean.*
+* *What are the benefits and problems with separating incidence matrices and creating adjacency matrices out of them?*    
+
+```{r}
+head(SWrawdata)
+head(Women.only)
+```
+
+This is adjacency matrix of women connections. It contains data about how often women meet with each others on events (do they participate in the same events or not).
+```{r}
+head(SWrawdata)
+head(Events.only)
+```
+This matrix shows do the same women participate in the different events and how often or not.
+
+The main problem is loosing information about link between women and particular events. From these two matrixed we can conclude how oftem women participate in the same events but can't say which events are. But on the other hand, separating the data we can obtain interpersonal relations and it also can be useful.
+
+******   
+
+
+```{r}
+SWnet.sep<-bipartite.projection(SWnet) # separate the two networks
+SWnet.sep
+
+V(SWnet.sep$proj1)$shape <- 'none'
+E(SWnet.sep$proj1)$color <- colorsGreys[2]
+V(SWnet.sep$proj2)$shape <- 'none'
+E(SWnet.sep$proj2)$color <- colorsGreys[2]
+par(mar=c(0,0,0,0), mfrow=c(1,2)) 
+plot(SWnet.sep$proj1) 
+plot(SWnet.sep$proj2)
+```
+
+******    
+
+_**Assignment task.**_ *For the network SouthernWomen, please calculate the following network characteristics and briefl explain what they mean:*   
+* *Indegree, outdegree, total degree;*    
+* *Centrality: degree, betweenness, closeness, eigenvector, page rank; correlations between these measures.*     
+* *Transitivity.*     
+
+* (As far as I understood, here we have to calculate centrality metrics for 'SWnet'. But I am not sure about it so as our net consist of incidence matrix but not adjacency matrix and I am not sure in the accuracy of these calculations.) 
+```{r degree}
+#Number of connections: that are terminated at particular node, that are started at a particular node, and full number
+
+#indegree
+indegree <- degree(SWnet, mode = 'in', normalized = F)
+indegree
+#outdegree
+outdegree <- degree(SWnet, mode = 'out', normalized = F)
+outdegree
+#full degree
+fulldegree <- degree(SWnet, mode = 'all', normalized = F)
+fulldegree
+```
+
+
+```{r}
+SWbetweenness <- betweenness(SWnet, directed = F, nobigint = TRUE, normalized = FALSE)
+SWbetweenness
+SWcloseness <- closeness(SWnet, mode = c("out", "in", "all", "total"), normalized = FALSE)
+SWcloseness
+SWeigen <- eigen_centrality(SWnet, directed = FALSE, scale = TRUE, options = NULL)
+SWeigen
+SWpageRank <- page_rank(SWnet, algo = c("prpack", "arpack", "power"), 
+  directed = FALSE, damping = 0.85, personalized = NULL, weights = NULL,
+  options = NULL)
+SWpageRank
+SWcentrality <- data.frame(SWbetweenness, SWcloseness, SWeigen$vector, SWpageRank$vector)
+
+head(SWcentrality)
+```
+
+```{r, echo = FALSE, message=F, warning=FALSE}
+library('Hmisc')
+```
+
+```{r}
+rcorr(as.matrix(SWcentrality), type="pearson")
+```
+As we can see, all centrality metrics higly correlate with each other, and this correlation is significant (p value = 0?).
+
+```{r}
+transitivity(SWnet, type = c("global"), isolates = c("NaN", "zero"))
+```
+It seems that probability that the vertices are connected is equel 0 due to using of incidence matrix and not adjancy matrix.

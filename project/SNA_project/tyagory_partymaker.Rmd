@@ -1,0 +1,113 @@
+---
+title: "R Notebook"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+```{r libraries, echo = FALSE, message=F, warning=FALSE}
+library(lubridate)
+library(vkR)
+library(network)
+library(sna)
+library(igraph)
+library(tibble)
+#library(statnet)
+# detach(package:sna)
+# detach(package:network) 
+# detach(package:igraph) 
+
+```
+
+There are two communities in VK dedicated to meme in cognitive psychology field: ["Cognitive partimaker"](https://vk.com/cogparty) and ["Tyagoty bytiya poznayuschego"](https://vk.com/subro_sa).
+And these communities are in the constant conflict with each other due to different attitudes in psychology.    
+But I suppose that a lot of people are in the both of them. I am interested to check is it true or not and who are that people who are only in the one community.
+
+
+# Getting token 
+```{r}
+token <- '7039f8fcd4af1aa3f126ff79e9d1224d7453dc881605c01191b2215b0b8350656f943ef02e51520ab2b9c'
+setAccessToken(token)
+areFriends(1,2)
+```
+
+
+
+
+# Tyagoty bytiya
+
+##Parsing data
+```{r}
+tyagoty_id <- 155160218
+#getGroupsMembersExecute(tygoty_id)
+usersTyagoty <- getGroupsMembersExecute(tyagoty_id, fields = 'first_name, last_name, sex, education')
+head(usersTyagoty)
+
+```
+
+```{r}
+usersTyagoty$fullname <- paste0(usersTyagoty$first_name, usersTyagoty$last_name)
+usersTyagoty <- add_column(usersTyagoty, fullname = paste0(usersTyagoty$first_name, ' ', usersTyagoty$last_name), 
+                           .after = "id")
+usersTyagoty_adj <- getArbitraryNetwork(usersTyagoty$id, format = 'adjmatrix')
+
+usersTyagoty_edge <- getArbitraryNetwork(usersTyagoty$id, format = "edgelist")
+View(usersTyagoty_adj)
+usersTyagoty_net_igraph <- graph.adjacency(usersTyagoty_adj, mode=c("undirected"), weighted=NULL, diag=FALSE)
+usersTyagoty_net_igraph2 <- graph_from_data_frame(usersTyagoty_edge, directed = F, vertices = usersTyagoty)
+```
+
+##Add atributes to the graph 
+```{r}
+list.vertex.attributes(usersTyagoty_net_igraph2)
+head(vertex_attr(usersTyagoty_net_igraph, 'name'))
+tp <- merge(as_data_frame(usersTyagoty_net_igraph, 'vertices'), usersTyagoty_table, by.x = 'name', by.y = "id")
+usersParty_net_igraph <- set_vertex_attr(usersParty_net_igraph, 'surname', value = tp$last_name)
+
+tp$last_name
+length(tp$last_name)
+
+length(as_data_frame(usersTyagoty_net_igraph, 'vertices')$name)
+
+list.vertex.attributes(usersTyagoty_net_igraph)
+```
+
+##Centrality measures
+
+```{r}
+tyagoty_degree <- degree(usersTyagoty_net_igraph2, mode = 'all')
+class(tyagoty_degree)
+head(tyagoty_degree)
+tyagoty_degree
+tyagoty_betweenness <- betweenness(usersTyagoty_net_igraph2, directed = F, weights = NULL)
+tyagoty_closeness <- closeness(usersTyagoty_net_igraph2, mode = 'all', weights = NULL)
+tyagoty_eigen <- eigen_centrality(usersTyagoty_net_igraph2, directed = F, weights = NULL)
+
+tyagity_measures <-  cbind(usersTyagoty, tyagoty_degree, tyagoty_betweenness, tyagoty_closeness, tyagoty_eigen)
+merge
+head(usersTyagoty)
+```
+
+
+```{r}
+plot(usersTyagoty_net_igraph2,
+     vertex.size = 1, 
+     edge.arrow.size = 0.1, 
+     vertex.label.cex = condSize,
+     # vertex.color = colors_spectr[9],
+     # edge.color=colors_greys[3], 
+     vertex.shape = 'circle', 
+     vertex.label = usersTyagoty$fullname,
+     vertex.label.dist = 1, 
+     vertex.label.degree = 5,
+     vertex.label.font = 1,
+     vertex.label.color = condColor, 
+     lty=2)
+
+```
+
+
+
+
+
+

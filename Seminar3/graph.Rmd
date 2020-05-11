@@ -1,0 +1,31 @@
+---
+title: "Graph"
+author: "Elena Rybina"
+date: "1/30/2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r libraries, echo = FALSE, message=F, warning=FALSE}
+#install.packages('RColorBrewer')
+#install.packages('sna')
+library('RColorBrewer')
+library('sna')
+library('network')
+#library('igraph')
+```
+
+```{r}
+load('madmen.Rdata')
+#View(mad.matrix)
+
+mad.net <- as.network(mad.matrix, directed=F)
+set.vertex.attribute(mad.net,attrname='female', value=mad.att[,2])
+colors <- ifelse(mad.att$Female == 1, 'red', 'blue')
+par(mar=c(0,0,0,0), mfrow=c(1,1))
+plot.network(mad.net, vertex.col = colors, label = network.vertex.names(mad.net), mode = 'kamadakawai',
+             displayisolates = T, label.pos = 1)
+```

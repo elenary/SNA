@@ -1,0 +1,285 @@
+---
+title: "Homework3"
+author: "Elena Rybina 'MKH 161'"
+date: "2/21/2018"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+```{r libraries, echo = FALSE, message=F, warning=FALSE}
+#install.packages("NetData")
+#install.packages('stats')
+#install.packages('factoextra')
+library('NetData')
+library(network)
+library(sna)
+library(RColorBrewer) 
+library(stats) 
+library('factoextra')
+library('nFactors')
+#detach(package:sna) 
+
+```
+
+## The data
+
+For the homework I choosed dataset from the 3d seminar about sexial networks from the TV show "Mad Man".    
+(As we will see later it isn't the best solution for clusterization of data).
+
+```{r data, fig.align='center'}
+load('madmen.Rdata')
+head(mad.matrix)
+isSymmetric.matrix(mad.matrix)
+mad.net <- as.network(mad.matrix, directed=FALSE)
+plot(mad.net)
+
+```   
+
+    
+Our matrix is symmetric and network is undirected, so, we don't need to symmetrize the network.     
+
+Let's add possible attributes to the network and improve the graph.
+
+```{r attributes, fig.align='center'}
+
+head(mad.att)
+set.vertex.attribute(mad.net, attrname='female', value=mad.att[,2])
+set.vertex.attribute(mad.net, attrname='male', value=1-mad.att[,2])
+#brewer.pal.info
+# display.brewer.pal(12, 'Set3')
+# display.brewer.pal(12, 'Set3')
+display.brewer.pal(11, 'RdBu')
+# display.brewer.pal(11, 'PiYG')
+# display.brewer.pal(9, 'PuBu')
+# display.brewer.pal(9, 'RdPu')
+colorRdBl <- brewer.pal(9, 'RdBu')
+colors_greys <- brewer.pal(9, 'Greys')
+colors <- ifelse(mad.att$Female == 1, colorRdBl[2], colorRdBl[9])
+par(mar=c(0,0,0,0), mfrow=c(1,1))
+plot.network(mad.net, vertex.col = colors, edge.col = colors_greys[2], label = network.vertex.names(mad.net),
+             mode = 'kamadakawai', displayisolates = T, label.pos = 2, label.cex = 0.5)
+
+```
+
+## Descritive statistcs and centrality measures   
+
+Firstly let's analyze this network through different statistics.
+```{r statistics}
+
+network.size(mad.net)
+network.edgecount(mad.net)
+network.dyadcount(mad.net)
+network.density(mad.net) 
+triad.census(mad.net)
+gtrans(mad.net, measure='weak')
+
+```
+So, this network has 45 nodes and 39 connections.   
+As we can see, density of network is very low (`r network.density(mad.net) `). Keeping in mind that this is network of sexual connections this data seems resonable.    
+We can see that in our data only 3 types of triads are present: 003, 102 and 201. It would be intersting to analyze it.   
+This network is completely non transitive. It is, again, reasonable, at least because sexual links implies different gender preferences and these connections unlikely could be transitive.    
+
+
+
+
+```{r centrality metrics 1}
+#paths
+kpath.census(mad.net, mode = "graph", tabulate.by.vertex = FALSE, path.comembership = "none", dyadic.tabulation = "none")
+#geodesic distances
+geo.dist<-geodist(mad.net) 
+summary(geo.dist$gdist)
+#cycles
+kcycle.census(mad.net, maxlen = 4, mode = "graph", tabulate.by.vertex = FALSE, cycle.comembership = "none")
+a <- clique.census(mad.net)
+#cliques
+clique.census(mad.net)$clique.count
+```
+
+The prevalent path is 2-connections-path. If will look at the matrix of geodesic distances we will see that the more often distance is infinity. It means a lot of disconnected nodes, that is, again, consistent with assumptions about sexual behavior. And our network hasn't cycles as was expected.   
+
+```{r centrality metrics 11}
+#degrees
+mad.degree <- degree(mad.net, gmode = 'graph', diag = FALSE, cmode = 'freeman', rescale = FALSE, 
+                     ignore.eval = TRUE)
+mad.degree
+hist(mad.degree)
+mad.betwdf <- data.frame(name = rownames(mad.matrix), degrees = mad.degree)
+mad.betwdf[order(mad.betwdf$degrees, decreasing = T),]
+
+```
+As we can see, Don Draper is the winner in terms of sexial links.
+
+```{r centrality metrics 2}
+# Betweenness
+mad.between <- betweenness(mad.net, gmode = 'graph', diag = FALSE, cmode = 'undirected')
+mad.between
+summary(mad.between)
+hist(mad.between)
+
+mad.betwdf <- data.frame(name = rownames(mad.matrix), betweenness = mad.between)
+mad.betwdf[order(mad.betwdf$betweenness, decreasing = T),]
+
+```
+And again, Don Draper has the max level of betweenness, e.g. he connects a lot if another species. Sounds logical, because Don Draper has the largest amount of links.
+
+```{r centrality metrics 3}
+
+#eigenvectors
+mad.eigen <- evcent(mad.net, gmode = 'graph', diag = FALSE, rescale = FALSE)
+mad.eigen
+summary(mad.eigen)
+hist(mad.eigen)
+mad.betwdf <- data.frame(name = rownames(mad.matrix), eigenvector = mad.eigen)
+mad.betwdf[order(mad.betwdf$eigenvector, decreasing = T),]
+
+
+```
+But Betty Draper overtaked Don Draper in terms of importancy of these links.    
+
+```{r centrality metrics 4}
+
+# centralization
+centralization(mad.net, FUN ='betweenness', normalize = TRUE)
+
+
+```
+
+##Exploratory block model
+
+### Cluster analysis
+
+One of the main questions of cluster analysis is determination of number of clusters. Usually in cluster analysis a scree plot is used for such determination. Let's draw regular scree plot for matrix of our euclidian distances.   
+
+```{r determination of number of clusters 1}
+
+dist.mad <- dist(mad.matrix, method="euclidian", diag=FALSE) 
+head(dist.mad)
+str(dist.mad)
+class(dist.mad)
+dist.mad.net.matrix <- as.matrix(dist.mad)
+str(dist.mad.net.matrix)
+
+#View(dist.mad.net.matrix)
+wss <- (nrow(dist.mad.net.matrix)-1)*sum(apply(dist.mad.net.matrix,2,var))
+for (i in 2:15) wss[i] <- sum(kmeans(dist.mad.net.matrix, 
+  	centers=i)$withinss)
+plot(1:15, wss, type="b", xlab="Number of Clusters",
+  ylab="Within groups sum of squares")
+
+```
+This scree plot give us suggestion to split our data on 4 or 6 clusters. But we can't trust only one method, so, let's try another one.    
+We can use function *fviz_nbclust* from the package *factoextra* that just tell us convinient number of clusters.   
+
+
+```{r determination of number of clusters 2}
+factoextra::fviz_nbclust(dist.mad.net.matrix, kmeans, k.max = 18, method = "gap_stat")
+```
+
+This function suggest to choose 12 clusters. This is a little bit overclustering. Check another methhod.    
+
+
+```{r determination of number of clusters 3}
+ev <- eigen(cor(dist.mad.net.matrix)) # get eigenvalues 
+ap <- parallel(subject=nrow(dist.mad.net.matrix), 
+               var=ncol(dist.mad.net.matrix),
+               rep=100,cent=.05)
+nS <- nScree(ev$values, ap$eigen$qevpea)
+plotnScree(nS)
+```
+Model based on eigenvalues suggest to split even into 17 clusters. This is really a lot because usually it makes sense to choose number of clusters in border between 2 and 15.    
+Let's try to visualize division on clusters in case of each number and check how our clusters spread.    
+
+#### k = 4
+
+```{r clustering k4}
+
+clasters.mad.net4 <- hclust(dist.mad, method="complete")
+plot(clasters.mad.net4) # display dendogram
+rect.hclust(clasters.mad.net4, k=4, border="red")
+
+
+```
+
+#### k = 6
+
+
+```{r clustering k6}
+
+clasters.mad.net6 <- hclust(dist.mad, method="complete")
+plot(clasters.mad.net6) # display dendogram
+rect.hclust(clasters.mad.net6, k=6, border="red")
+
+
+```
+
+Initially, I ignored suggestions to choose number of clusters >10 and stopped only on 6 clusters and decided that something is wrong with my analysis: it just takes each new person and splits it into a new cluster. But later I continued with number of clusters > 10 and saw that within a really big amount of clusters some groups are started to form.
+
+#### k = 12
+
+
+```{r clustering k12}
+
+clasters.mad.net12 <- hclust(dist.mad, method="complete")
+plot(clasters.mad.net12) # display dendogram
+rect.hclust(clasters.mad.net12, k=12, border="red")
+
+
+```
+
+#### k = 17
+
+
+```{r clustering k17}
+
+clasters.mad.net17 <- hclust(dist.mad, method="complete")
+plot(clasters.mad.net17) # display dendogram
+rect.hclust(clasters.mad.net17, k=17, border="red")
+
+
+```
+
+And I was lost in thought about features of this networks. It seems quite logical that on data about sexual links we can't see precise clusters, especially on small sample from the TV show because it is unlikely that characters demonstrate the same sexual behavior.    
+I suppose that we might see some clusters in data of sexual behavior but it requires a really big sample that includes closed and active communities.   
+
+For our analysis let's choose k=12.
+
+```{r blockmodel}
+exploratoryblmdl.mad.net <- blockmodel(mad.net, clasters.mad.net12, k=12, block.content="density", 
+                              mode="graph", diag=FALSE)
+plot(exploratoryblmdl.mad.net)
+```
+
+### CONCOR using
+
+```{r CONCOR function}
+CONCOR <- function(mat, max.iter=1000, epsilon=1e-10){
+mat <- rbind(mat, t(mat)) # stack
+colN <- ncol(mat) # width
+X <- matrix(rep(0, times=colN*colN), nrow=colN, ncol=colN) 
+target.abs.value <- colN * colN - epsilon # convergence target 
+for (iter in 1:max.iter){ 
+    for(i in 1:colN) {
+      for(j in i:colN){
+        X[i,j]<-cor(mat[,i], mat[,j], method=c("pearson")) 
+      } 
+    } 
+  mat <- X+(t(X)-diag(diag((X))))
+if (sum(abs(mat)) > target.abs.value) { # test convergence
+      #Finished before max.iter iterations
+return(mat) 
+  } 
+} 
+return(mat) 
+} 
+```
+
+```{r}
+concormad<-CONCOR(mad.matrix)
+
+#print(concormad) 
+heatmap(concormad)
+```
+Here we see 4 blocks that are symmetric. So, we can split each block out of two also on separate clusters.
+(And so on)
+
